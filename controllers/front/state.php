@@ -84,7 +84,7 @@ class BlockBeeStateModuleFrontController extends ModuleFrontController
             'crypto_total' => (float) $metaData['blockbee_total'],
             'already_paid' => $alreadyPaid,
             'remaining' => $remainingPending <= 0 ? 0 : $remainingPending,
-            'fiat_remaining' => $remainingFiat <= 0 ? 0 : $remainingFiat,
+            'fiat_remaining' => $remainingFiat <= 0 ? 0 : (float)round($remainingFiat,2),
             'already_paid_fiat' => (float) $alreadyPaidFiat <= 0 ? 0 : (float) $alreadyPaidFiat,
             'fiat_symbol' => Currency::getDefaultCurrency()->symbol,
         ];
