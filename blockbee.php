@@ -40,7 +40,7 @@ class blockbee extends PaymentModule
         $this->ps_versions_compliancy = ['min' => '1.7', 'max' => '1.7.9.99'];
         $this->author = 'BlockBee';
         $this->controllers = ['state', 'validation', 'callback', 'success', 'cronjob', 'fee'];
-
+        $this->module_key = '47cc969f06561eca622b85d1df87b189';
         $this->currencies = true;
         $this->currencies_mode = 'checkbox';
 
