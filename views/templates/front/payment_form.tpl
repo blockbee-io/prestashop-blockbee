@@ -18,7 +18,7 @@
 
 <form action="{$action}" id="payment-form">
     <p>
-        <select class="form-control form-control-select" id="coin" name="blockbee_coin">
+        <select class="form-control form-control-select" id="blockbee_coin" name="blockbee_coin">
             <option value="none">{l s='Please select a cryptocurrency' mod='blockbee'}</option>
             {foreach from=$cryptocurrencies key=myId item=i}
                 <option value="{$i.ticker}">{$i.coin}</option>
@@ -36,7 +36,7 @@
 </form>
 <script>
     const fee_url = '{$fee}'
-    document.getElementById('coin').addEventListener('change', function () {
+    document.getElementById('blockbee_coin').addEventListener('change', function () {
         let val = this.value;
         const payment_fee = document.getElementById('blockbee_fee');
         const buttonContainer = document.querySelector('.js-payment-confirmation');
