@@ -57,7 +57,7 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
         $total = (float) $cart->getOrderTotal(true, Cart::BOTH) + $fee;
         $currency = $this->context->currency;
 
-        $disableConversion = Configuration::get('disable_conversion') === '0' ? false : true;
+        $disableConversion = Configuration::get('blockbee_disable_conversion') === '0' ? false : true;
         $info = BlockBeeHelper::get_info($selected);
         $minTx = (float) $info->minimum_transaction_coin;
 
@@ -67,7 +67,7 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
             exit($this->module->l('Value too low, minimum is.', 'validation')) . $minTx;
         }
 
-        $apiKey = Configuration::get('api_key');
+        $apiKey = Configuration::get('blockbee_api_key');
 
         if (empty($apiKey)) {
             exit($this->module->l('There\'s was an error with this payment. Please try again.', 'validation'));
@@ -86,7 +86,7 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
             $customer->secure_key
         );
 
-        $qrCodeSize = Configuration::get('qrcode_size');
+        $qrCodeSize = Configuration::get('blockbee_qrcode_size');
 
         $nonce = blockbee::generateNonce();
         $orderId = $this->module->currentOrder;

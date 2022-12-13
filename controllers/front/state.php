@@ -57,7 +57,7 @@ class BlockBeeStateModuleFrontController extends ModuleFrontController
             $blockbeePending = 1;
         }
 
-        $counterCalc = (int) $metaData['blockbee_last_price_update'] + (int) Configuration::get('refresh_value_interval') - time();
+        $counterCalc = (int) $metaData['blockbee_last_price_update'] + (int) Configuration::get('blockbee_refresh_value_interval') - time();
 
         if ($counterCalc < 0 && !$paid) {
             blockbee::blockbeeCronjob();

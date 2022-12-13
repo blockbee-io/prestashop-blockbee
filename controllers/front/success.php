@@ -29,8 +29,8 @@ class BlockBeeSuccessModuleFrontController extends ModuleFrontController
 
         $order = new Order((int) $orderId);
 
-        $refresh_value_interval = (int) Configuration::get('refresh_value_interval');
-        $order_cancelation_timeout = (int) Configuration::get('order_cancelation_timeout');
+        $refresh_value_interval = (int) Configuration::get('blockbee_refresh_value_interval');
+        $order_cancelation_timeout = (int) Configuration::get('blockbee_order_cancelation_timeout');
 
         $allowed_to_value = [
             'btc',
@@ -53,18 +53,18 @@ class BlockBeeSuccessModuleFrontController extends ModuleFrontController
 
         $this->context->smarty->assign([
             'order_id' => $orderId,
-            'color_scheme' => Configuration::get('color_scheme'),
+            'color_scheme' => Configuration::get('blockbee_color_scheme'),
             'currency_symbol' => $this->context->currency->iso_code,
             'total' => $order->total_paid_tax_incl,
-            'qrcode_size' => (int) Configuration::get('qrcode_size') + 20,
-            'qrcode_default' => Configuration::get('qrcode_default') === '0' ? false : true,
-            'show_branding' => Configuration::get('show_branding') === '0' ? false : true,
+            'qrcode_size' => (int) Configuration::get('blockbee_qrcode_size') + 20,
+            'qrcode_default' => Configuration::get('blockbee_qrcode_default') === '0' ? false : true,
+            'show_branding' => Configuration::get('blockbee_show_branding') === '0' ? false : true,
             'address_in' => $metaData['blockbee_address'],
             'crypto_value' => $metaData['blockbee_total'],
             'crypto_coin' => strtoupper($metaData['blockbee_currency']),
             'qr_code_img_value' => $metaData['blockbee_qr_code_value'],
             'qr_code_img' => $metaData['blockbee_qr_code'],
-            'qr_code_setting' => Configuration::get('qrcode_setting'),
+            'qr_code_setting' => Configuration::get('blockbee_qrcode_setting'),
             'canceled' => $order->getCurrentOrderState()->id !== (int) Configuration::get('PS_OS_CANCELED') ? 1 : 0,
             'module_dir' => Media::getMediaPath(_PS_MODULE_DIR_ . 'blockbee/'),
             'conversion_timer' => $conversion_timer,

@@ -22,7 +22,7 @@ class BlockBeeFeeModuleFrontController extends ModuleFrontController
     {
         require_once _PS_MODULE_DIR_ . 'blockbee/lib/BlockBeeHelper.php';
 
-        $totalFee = Configuration::get('fee_order_percentage');
+        $totalFee = Configuration::get('blockbee_fee_order_percentage');
 
         if (empty($totalFee)) {
             exit(json_encode([
@@ -46,9 +46,9 @@ class BlockBeeFeeModuleFrontController extends ModuleFrontController
             ]));
         }
 
-        $apiKey = Configuration::get('api_key');
+        $apiKey = Configuration::get('blockbee_api_key');
 
-        if (!empty($selected) && $selected != 'none' && !empty(Configuration::get('add_blockchain_fee'))) {
+        if (!empty($selected) && $selected != 'none' && !empty(Configuration::get('blockbee_add_blockchain_fee'))) {
             $est = BlockBeeHelper::get_estimate($selected, $apiKey);
 
             $feeOrder += (float) $est->{Currency::getDefaultCurrency()->iso_code};

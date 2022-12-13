@@ -36,11 +36,11 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
             exit('*ok*');
         }
 
-        $disableConversion = Configuration::get('disable_conversion') === 1 ? true : false;
+        $disableConversion = Configuration::get('blockbee_disable_conversion') === 1 ? true : false;
 
-        $qrCodeSize = Configuration::get('qrcode_size');
+        $qrCodeSize = Configuration::get('blockbee_qrcode_size');
 
-        $apiKey = Configuration::get('api_key');
+        $apiKey = Configuration::get('blockbee_api_key');
 
         $paid = (float) $callback['value_coin'];
 
