@@ -1,5 +1,21 @@
+{**
+ * 2022 BlockBee
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Academic Free License (AFL 3.0)
+ * that is bundled with this package in the file LICENSE.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://opensource.org/licenses/afl-3.0.php
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to info@blockbee.io so we can send you a copy immediately.
+ *
+ *  @author BlockBee <info@blockbee.io>
+ *  @copyright  2022 BlockBee
+ *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ *}
 {extends "$layout"}
-
 {block name="content"}
     <div class="blockbee_payment-panel {$color_scheme}">
         <div class="blockbee_payment_details">
@@ -100,7 +116,7 @@
                     <div class="blockbee_branding">
                         <a href="https://blockbee.io/" target="_blank">
                             <span>Powered by</span>
-                            <img width="94" class="img-fluid" src="{$module_dir|escape:'htmlall':'UTF-8'}views/css/files/200_logo_ca.png" alt="Blockbee Logo"/>
+                            <img width="94" class="img-fluid" src="{$module_dir|escape:'htmlall':'UTF-8'}views/img/blockbee_payment.png" alt="Blockbee Logo"/>
                         </a>
                     </div>
                 {/if}

@@ -1,14 +1,29 @@
 <?php
-
+/**
+ * 2022 BlockBee
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Academic Free License (AFL 3.0)
+ * that is bundled with this package in the file LICENSE.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://opensource.org/licenses/afl-3.0.php
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to info@blockbee.io so we can send you a copy immediately.
+ *
+ *  @author BlockBee <info@blockbee.io>
+ *  @copyright  2022 BlockBee
+ *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ */
 class BlockBeeStateModuleFrontController extends ModuleFrontController
 {
-
     public function initContent()
     {
         require_once _PS_MODULE_DIR_ . 'blockbee/lib/BlockBeeHelper.php';
 
         if (empty($_REQUEST['order_id'])) {
-            die($this->module->l('Order not found.', 'error', 'en'));
+            exit($this->module->l('Order not found.', 'error', 'en'));
         }
 
         $orderId = $_REQUEST['order_id'];
@@ -17,27 +32,24 @@ class BlockBeeStateModuleFrontController extends ModuleFrontController
             $metaData = json_decode(blockbee::getPaymentResponse($orderId), true);
             $historyDb = $metaData['blockbee_history'];
         } catch (Exception $e) {
-            die($this->module->l('Order not found.', 'error', 'en'));
+            exit($this->module->l('Order not found.', 'error', 'en'));
         }
 
-        $order = new Order((int)$orderId);
+        $order = new Order((int) $orderId);
 
         $showMinFee = 0;
 
         $calc = blockbee::calcOrder($historyDb, $metaData['blockbee_total'], $metaData['blockbee_total_fiat']);
 
-
-
         $alreadyPaid = $calc['already_paid'];
         $alreadyPaidFiat = $calc['already_paid_fiat'];
 
-        $min_tx = floatval($metaData['blockbee_min']);
+        $min_tx = (float) $metaData['blockbee_min'];
 
         $remainingPending = $calc['remaining_pending'];
         $remainingFiat = $calc['remaining_fiat'];
 
         $blockbeePending = 0;
-
 
         $paid = $order->getCurrentState() === Configuration::get('PS_OS_PAYMENT') ? 1 : 0;
 
@@ -45,8 +57,7 @@ class BlockBeeStateModuleFrontController extends ModuleFrontController
             $blockbeePending = 1;
         }
 
-        $counterCalc = (int)$metaData['blockbee_last_price_update'] + (int)Configuration::get('refresh_value_interval') - time();
-
+        $counterCalc = (int) $metaData['blockbee_last_price_update'] + (int) Configuration::get('refresh_value_interval') - time();
 
         if ($counterCalc < 0 && !$paid) {
             blockbee::blockbeeCronjob();
@@ -61,23 +72,23 @@ class BlockBeeStateModuleFrontController extends ModuleFrontController
             $remainingFiat = 0;
         }
 
-        $params = array(
+        $params = [
             'is_paid' => $paid,
             'is_pending' => $blockbeePending,
             'qr_code_value' => $metaData['blockbee_qr_code_value'],
-            'canceled' => $order->getCurrentOrderState()->id === (int)Configuration::get('PS_OS_CANCELED') ? 1 : 0,
+            'canceled' => $order->getCurrentOrderState()->id === (int) Configuration::get('PS_OS_CANCELED') ? 1 : 0,
             'coin' => strtoupper($metaData['blockbee_currency']),
             'show_min_fee' => $showMinFee,
             'order_history' => $historyDb,
-            'counter' => (string)$counterCalc,
-            'crypto_total' => floatval($metaData['blockbee_total']),
+            'counter' => (string) $counterCalc,
+            'crypto_total' => (float) $metaData['blockbee_total'],
             'already_paid' => $alreadyPaid,
             'remaining' => $remainingPending <= 0 ? 0 : $remainingPending,
             'fiat_remaining' => $remainingFiat <= 0 ? 0 : $remainingFiat,
-            'already_paid_fiat' => floatval($alreadyPaidFiat) <= 0 ? 0 : floatval($alreadyPaidFiat),
+            'already_paid_fiat' => (float) $alreadyPaidFiat <= 0 ? 0 : (float) $alreadyPaidFiat,
             'fiat_symbol' => Currency::getDefaultCurrency()->symbol,
-        );
+        ];
 
-        die(json_encode($params));
+        exit(json_encode($params));
     }
 }

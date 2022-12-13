@@ -1,3 +1,21 @@
+/**
+ * 2022 BlockBee
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Academic Free License (AFL 3.0)
+ * that is bundled with this package in the file LICENSE.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://opensource.org/licenses/afl-3.0.php
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to info@blockbee.io so we can send you a copy immediately.
+ *
+ *  @author BlockBee <info@blockbee.io>
+ *  @copyright  2022 BlockBee
+ *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ */
+
 .blockbee_payment-panel {
     max-width: 700px;
     width: 100%;
@@ -147,7 +165,7 @@
     right: 25px;
     padding: 0 !important;
     background-size: contain !important;
-    background: transparent url(./files/blockbee_copy_icon.svg) no-repeat !important;
+    background: transparent url(../img/blockbee_copy_icon.svg) no-repeat !important;
     border: 0 !important;
 }
 
@@ -163,7 +181,7 @@
     left: 10px;
     width: 50px;
     height: 50px;
-    background-image: url(./files/blockbee_loader.svg);
+    background-image: url(../img/blockbee_loader.svg);
     background-size: contain;
     top: calc(50% - 25px);
     bottom: 0;
@@ -171,7 +189,7 @@
 }
 
 .blockbee_loader_payment_processing {
-    background-image: url(./files/blockbee_loader.svg);
+    background-image: url(../img/blockbee_loader.svg);
     background-size: 150%;
     background-repeat: no-repeat;
     width: 120px;
@@ -528,7 +546,7 @@
 }
 
 .blockbee_payment-panel.dark .blockbee_copy_icon {
-    background: transparent url(./files/blockbee_copy_icon_dark.svg) no-repeat !important
+    background: transparent url(../img/blockbee_copy_icon_dark.svg) no-repeat !important
 }
 
 .blockbee_payment-panel.dark .blockbee_progress_icon svg path {
@@ -589,7 +607,7 @@
     }
 
     .blockbee_payment-panel.auto .blockbee_copy_icon {
-        background: transparent url(./files/blockbee_copy_icon_dark.svg) no-repeat !important
+        background: transparent url(../img/blockbee_copy_icon_dark.svg) no-repeat !important
     }
 
     .blockbee_payment-panel.auto .blockbee_progress_icon svg path {

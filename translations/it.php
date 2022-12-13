@@ -1,7 +1,7 @@
 <?php
 
 global $_MODULE;
-$_MODULE = array();
+$_MODULE = [];
 $_MODULE['<{blockbee}prestashop>blockbee_dfdc317312cace19ccef34f643b5a73c'] = 'BlockBee Payment Gateway for PrestaShop	';
 $_MODULE['<{blockbee}prestashop>blockbee_602647c0ad09e510fab44b29d3768600'] = 'Accetta pagamenti in criptovaluta sul tuo sito PrestaShop';
 $_MODULE['<{blockbee}prestashop>blockbee_876f23178c29dc2552c0b48bf23cd9bd'] = 'Sei sicuro di voler disinstallare?';

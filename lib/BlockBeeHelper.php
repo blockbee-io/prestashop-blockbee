@@ -1,9 +1,25 @@
 <?php
-
+/**
+ * 2022 BlockBee
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Academic Free License (AFL 3.0)
+ * that is bundled with this package in the file LICENSE.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://opensource.org/licenses/afl-3.0.php
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to info@blockbee.io so we can send you a copy immediately.
+ *
+ *  @author BlockBee <info@blockbee.io>
+ *  @copyright  2022 BlockBee
+ *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ */
 class BlockBeeHelper
 {
-    private static $base_url = "https://api.blockbee.io";
-    private static $cryptapi_url = "https://api.cryptapi.io";
+    private static $base_url = 'https://api.blockbee.io';
+    private static $cryptapi_url = 'https://api.cryptapi.io';
     private $payment_address = null;
     private $callback_url = null;
     private $coin = null;
@@ -58,8 +74,9 @@ class BlockBeeHelper
 
     public function checklogs()
     {
-
-        if (empty($this->coin) || empty($this->callback_url)) return null;
+        if (empty($this->coin) || empty($this->callback_url)) {
+            return null;
+        }
 
         $params = [
             'callback' => $this->callback_url,
@@ -78,20 +95,22 @@ class BlockBeeHelper
 
     public function get_qrcode($value, $size)
     {
-        if (empty($this->coin)) return null;
+        if (empty($this->coin)) {
+            return null;
+        }
 
         if (empty($value)) {
             $params = [
                 'address' => $this->payment_address,
                 'size' => $size,
-                'apikey' => $this->api_key
+                'apikey' => $this->api_key,
             ];
         } else {
             $params = [
                 'address' => $this->payment_address,
                 'value' => $value,
                 'size' => $size,
-                'apikey' => $this->api_key
+                'apikey' => $this->api_key,
             ];
         }
 
@@ -115,13 +134,13 @@ class BlockBeeHelper
                 'address' => $address,
                 'value' => $value,
                 'size' => $size,
-                'apikey' => $api_key
+                'apikey' => $api_key,
             ];
         } else {
             $params = [
                 'address' => $address,
                 'size' => $size,
-                'apikey' => $api_key
+                'apikey' => $api_key,
             ];
         }
 
@@ -145,7 +164,7 @@ class BlockBeeHelper
         unset($info['fee_tiers']);
 
         $coins = [];
-        
+
         foreach ($info as $chain => $data) {
             $is_base_coin = in_array('ticker', array_keys($data));
             if ($is_base_coin) {
@@ -198,7 +217,9 @@ class BlockBeeHelper
         ];
 
         foreach ($_get as $k => $v) {
-            if (isset($params[$k])) continue;
+            if (isset($params[$k])) {
+                continue;
+            }
             $params[$k] = $_get[$k];
         }
 
@@ -211,7 +232,6 @@ class BlockBeeHelper
 
     public static function get_conversion($from, $to, $value, $disable_conversion)
     {
-
         if ($disable_conversion) {
             return $value;
         }
@@ -233,17 +253,15 @@ class BlockBeeHelper
 
     public static function get_estimate($coin, $api_key)
     {
-
         $params = [
             'addresses' => 1,
             'priority' => 'default',
-            'apikey' => $api_key
+            'apikey' => $api_key,
         ];
 
         $response = BlockBeeHelper::_request($coin, 'estimate', $params);
 
         if ($response->status == 'success') {
-
             return $response->estimated_cost_currency;
         }
 
@@ -262,15 +280,15 @@ class BlockBeeHelper
 
         $answer = ($decimalPlaces > 0) ?
             number_format($value, $decimalPlaces, '.', '') : round($value, $decimalPlaces);
+
         return $answer;
     }
 
     private static function _request($coin, $endpoint, $params = [], $assoc = false)
     {
-
         $base_url = BlockBeeHelper::$base_url;
 
-        if($endpoint === 'info' || $endpoint === 'convert' || $endpoint === 'logs') {
+        if ($endpoint === 'info' || $endpoint === 'convert' || $endpoint === 'logs') {
             $base_url = BlockBeeHelper::$cryptapi_url;
         }
 
@@ -301,6 +319,7 @@ class BlockBeeHelper
 
         if (curl_error($curl)) {
             $json['error'] = 'ERROR: ' . curl_errno($curl) . '::' . curl_error($curl);
+
             return $json;
         } elseif ($response) {
             return json_decode($response, $assoc);

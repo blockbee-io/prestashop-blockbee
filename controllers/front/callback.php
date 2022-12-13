@@ -1,24 +1,39 @@
 <?php
-
+/**
+ * 2022 BlockBee
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Academic Free License (AFL 3.0)
+ * that is bundled with this package in the file LICENSE.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://opensource.org/licenses/afl-3.0.php
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to info@blockbee.io so we can send you a copy immediately.
+ *
+ *  @author BlockBee <info@blockbee.io>
+ *  @copyright  2022 BlockBee
+ *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ */
 class BlockBeeCallbackModuleFrontController extends ModuleFrontController
 {
-
     public function postProcess()
     {
         require_once _PS_MODULE_DIR_ . 'blockbee/lib/BlockBeeHelper.php';
 
         $callback = $_REQUEST;
 
-        $orderId = (int)$callback['order'];
+        $orderId = (int) $callback['order'];
 
         $order = new Order($orderId);
 
-        $metaData = json_decode(blockBee::getPaymentResponse($orderId), true);
+        $metaData = json_decode(blockbee::getPaymentResponse($orderId), true);
 
         $paid = $order->getCurrentState() === Configuration::get('PS_OS_PAYMENT') ? true : false;
 
-        if ($paid || $order->getCurrentOrderState()->id === (int)Configuration::get('PS_OS_CANCELED') || $callback['nonce'] !== $metaData['blockbee_nonce']) {
-            die("*ok*");
+        if ($paid || $order->getCurrentOrderState()->id === (int) Configuration::get('PS_OS_CANCELED') || $callback['nonce'] !== $metaData['blockbee_nonce']) {
+            exit('*ok*');
         }
 
         $disableConversion = Configuration::get('disable_conversion') === 1 ? true : false;
@@ -27,9 +42,9 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
 
         $apiKey = Configuration::get('api_key');
 
-        $paid = floatval($callback['value_coin']);
+        $paid = (float) $callback['value_coin'];
 
-        $minTx = floatval($metaData['blockbee_min']);
+        $minTx = (float) $metaData['blockbee_min'];
 
         $historyDb = $metaData['blockbee_history'];
 
@@ -40,7 +55,7 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
                 'timestamp' => time(),
                 'value_paid' => BlockBeeHelper::sig_fig($paid, 6),
                 'value_paid_fiat' => $fiat_conversion,
-                'pending' => $callback['pending']
+                'pending' => $callback['pending'],
             ];
         } else {
             $historyDb[$callback['uuid']]['pending'] = $callback['pending'];
@@ -48,7 +63,7 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
 
         blockbee::updatePaymentResponse($orderId, 'blockbee_history', $historyDb);
 
-        $metaData = json_decode(blockBee::getPaymentResponse($orderId), true);
+        $metaData = json_decode(blockbee::getPaymentResponse($orderId), true);
 
         $historyDb = $metaData['blockbee_history'];
 
@@ -66,20 +81,20 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
         if ($remainingPending <= 0) {
             if ($remaining <= 0) {
                 $history = new OrderHistory();
-                $history->id_order = (int)$callback['order'];
-                $history->changeIdOrderState((int)Configuration::get('PS_OS_PAYMENT'), $history->id_order, false);
+                $history->id_order = (int) $callback['order'];
+                $history->changeIdOrderState((int) Configuration::get('PS_OS_PAYMENT'), $history->id_order, false);
                 $history->addWithemail();
                 $history->save();
             }
-            die("*ok*");
+            exit('*ok*');
         }
 
         if ($remainingPending < $minTx) {
-            blockBee::updatePaymentResponse($orderId, 'blockbee_qr_code_value', BlockBeeHelper::get_static_qrcode($metaData['blockbee_address'], $metaData['blockbee_currency'], $minTx, $apiKey, $qrCodeSize)['qr_code']);
+            blockbee::updatePaymentResponse($orderId, 'blockbee_qr_code_value', BlockBeeHelper::get_static_qrcode($metaData['blockbee_address'], $metaData['blockbee_currency'], $minTx, $apiKey, $qrCodeSize)['qr_code']);
         } else {
-            blockBee::updatePaymentResponse($orderId, 'blockbee_qr_code_value', BlockBeeHelper::get_static_qrcode($metaData['blockbee_address'], $metaData['blockbee_currency'], $remainingPending, $apiKey, $qrCodeSize)['qr_code']);
+            blockbee::updatePaymentResponse($orderId, 'blockbee_qr_code_value', BlockBeeHelper::get_static_qrcode($metaData['blockbee_address'], $metaData['blockbee_currency'], $remainingPending, $apiKey, $qrCodeSize)['qr_code']);
         }
 
-        die("*ok*");
+        exit('*ok*');
     }
 }
