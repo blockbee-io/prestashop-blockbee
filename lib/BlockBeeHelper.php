@@ -246,7 +246,7 @@ class BlockBeeHelper
             'from' => $from,
             'to' => $to,
             'value' => $value,
-            'apikey' => $api_key
+            'apikey' => $api_key,
         ];
 
         $response = BlockBeeHelper::_request('', 'convert', $params);

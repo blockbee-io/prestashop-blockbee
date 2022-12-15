@@ -68,7 +68,6 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
             exit($this->module->l('Value too low, minimum is.', 'validation')) . $minTx;
         }
 
-
         if (empty($apiKey)) {
             exit($this->module->l('There\'s was an error with this payment. Please try again.', 'validation'));
         }

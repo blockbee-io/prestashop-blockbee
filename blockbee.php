@@ -50,7 +50,6 @@ class blockbee extends PaymentModule
 
         parent::__construct();
 
-
         if (!count(Currency::checkPaymentCurrencies($this->id))) {
             $this->warning = $this->l('No currency has been set for this module.', '', 'en');
         }
@@ -212,7 +211,6 @@ class blockbee extends PaymentModule
                 ];
             }
         } catch (Exception $e) {
-            //
         }
 
         $default_nonce = empty(Tools::getValue('blockbee_cronjob_nonce', Configuration::get('blockbee_cronjob_nonce'))) ? blockbee::generateNonce() : Tools::getValue('blockbee_cronjob_nonce', Configuration::get('blockbee_cronjob_nonce'));
@@ -498,7 +496,7 @@ class blockbee extends PaymentModule
                                 [
                                     'id_option' => 'auto',
                                     'name' => 'Auto',
-                                ]
+                                ],
                             ],
                             'id' => 'id_option',
                             'name' => 'name',
