@@ -19,7 +19,6 @@
 class BlockBeeHelper
 {
     private static $base_url = 'https://api.blockbee.io';
-    private static $cryptapi_url = 'https://api.cryptapi.io';
     private $payment_address = null;
     private $callback_url = null;
     private $coin = null;
@@ -78,8 +77,11 @@ class BlockBeeHelper
             return null;
         }
 
+        $api_key = $this->api_key;
+
         $params = [
             'callback' => $this->callback_url,
+            'apikey' => $api_key,
         ];
 
         $response = BlockBeeHelper::_request($this->coin, 'logs', $params);
@@ -155,7 +157,7 @@ class BlockBeeHelper
 
     public static function get_supported_coins()
     {
-        $info = BlockBeeHelper::get_info(null, true);
+        $info = BlockBeeHelper::get_info(null, true, '');
 
         if (empty($info)) {
             return null;
@@ -183,12 +185,16 @@ class BlockBeeHelper
         return $coins;
     }
 
-    public static function get_info($coin = null, $assoc = false)
+    public static function get_info($coin = null, $assoc = false, $api_key = '')
     {
         $params = [];
 
         if (empty($coin)) {
             $params['prices'] = '0';
+        }
+
+        if (!empty($api_key)) {
+            $params['apikey'] = $api_key;
         }
 
         $response = BlockBeeHelper::_request($coin, 'info', $params, $assoc);
@@ -230,7 +236,7 @@ class BlockBeeHelper
         return $params;
     }
 
-    public static function get_conversion($from, $to, $value, $disable_conversion)
+    public static function get_conversion($from, $to, $value, $disable_conversion, $api_key)
     {
         if ($disable_conversion) {
             return $value;
@@ -240,6 +246,7 @@ class BlockBeeHelper
             'from' => $from,
             'to' => $to,
             'value' => $value,
+            'apikey' => $api_key
         ];
 
         $response = BlockBeeHelper::_request('', 'convert', $params);
@@ -287,10 +294,6 @@ class BlockBeeHelper
     private static function _request($coin, $endpoint, $params = [], $assoc = false)
     {
         $base_url = BlockBeeHelper::$base_url;
-
-        if ($endpoint === 'info' || $endpoint === 'convert' || $endpoint === 'logs') {
-            $base_url = BlockBeeHelper::$cryptapi_url;
-        }
 
         if (!empty($params)) {
             $data = http_build_query($params);

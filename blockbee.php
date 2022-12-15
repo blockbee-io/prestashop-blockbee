@@ -43,17 +43,13 @@ class blockbee extends PaymentModule
         $this->module_key = '47cc969f06561eca622b85d1df87b189';
         $this->currencies = true;
         $this->currencies_mode = 'checkbox';
-
         $this->displayName = $this->l('BlockBee Payment Gateway for PrestaShop', '', 'en');
         $this->description = $this->l('Accept cryptocurrency payments on your PrestaShop website', '', 'en');
-
         $this->bootstrap = true;
+        $this->confirmUninstall = $this->l('Are you sure you want to uninstall?', '', 'en');
 
         parent::__construct();
 
-        $this->displayName = $this->l('BlockBee Payment Gateway for PrestaShop', '', 'en');
-        $this->description = $this->l('Accept cryptocurrency payments on your PrestaShop website', '', 'en');
-        $this->confirmUninstall = $this->l('Are you sure you want to uninstall?', '', 'en');
 
         if (!count(Currency::checkPaymentCurrencies($this->id))) {
             $this->warning = $this->l('No currency has been set for this module.', '', 'en');
@@ -147,6 +143,12 @@ class blockbee extends PaymentModule
                 return $output;
             }
 
+            if (empty($api_key)) {
+                $output = $this->displayError($this->l('Please insert a valid API Key.', '', 'en'));
+
+                return $output;
+            }
+
             if (empty($coins)) {
                 $output = $this->displayError($this->l('Invalid Configuration value. Please select the cryptocurrencies you want to enable.', '', 'en'));
 
@@ -196,14 +198,21 @@ class blockbee extends PaymentModule
     {
         $db = Db::getInstance();
 
-        $cryptocurrencies_api = BlockBeeHelper::get_supported_coins();
+        $apiKey = Configuration::get('blockbee_api_key');
+
         $cryptocurrencies = [];
 
-        foreach ($cryptocurrencies_api as $ticker => $coin) {
-            $cryptocurrencies[] = [
-                'id_option' => $ticker,
-                'name' => $coin,
-            ];
+        try {
+            $cryptocurrencies_api = BlockBeeHelper::get_supported_coins($apiKey);
+
+            foreach ($cryptocurrencies_api as $ticker => $coin) {
+                $cryptocurrencies[] = [
+                    'id_option' => $ticker,
+                    'name' => $coin,
+                ];
+            }
+        } catch (Exception $e) {
+            //
         }
 
         $default_nonce = empty(Tools::getValue('blockbee_cronjob_nonce', Configuration::get('blockbee_cronjob_nonce'))) ? blockbee::generateNonce() : Tools::getValue('blockbee_cronjob_nonce', Configuration::get('blockbee_cronjob_nonce'));
@@ -871,7 +880,7 @@ class blockbee extends PaymentModule
                         if ($remaining === $remaining_pending) {
                             $blockbee_coin = $metaData['blockbee_currency'];
 
-                            $crypto_total = BlockBeeHelper::sig_fig(BlockBeeHelper::get_conversion($currency, $blockbee_coin, $order['total_paid'], $disableConversion), 6);
+                            $crypto_total = BlockBeeHelper::sig_fig(BlockBeeHelper::get_conversion($currency, $blockbee_coin, $order['total_paid'], $disableConversion, $apiKey), 6);
 
                             blockbee::updatePaymentResponse($orderId, 'blockbee_total', $crypto_total);
 

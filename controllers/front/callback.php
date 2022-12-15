@@ -49,7 +49,7 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
         $historyDb = $metaData['blockbee_history'];
 
         if (empty($historyDb[$callback['uuid']])) {
-            $fiat_conversion = BlockBeeHelper::get_conversion($metaData['blockbee_currency'], Currency::getDefaultCurrency()->iso_code, $paid, $disableConversion);
+            $fiat_conversion = BlockBeeHelper::get_conversion($metaData['blockbee_currency'], Currency::getDefaultCurrency()->iso_code, $paid, $disableConversion, $apiKey);
 
             $historyDb[$callback['uuid']] = [
                 'timestamp' => time(),

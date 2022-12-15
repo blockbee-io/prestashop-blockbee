@@ -51,6 +51,7 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
         }
 
         $sessionFee = $this->context->cookie->blockbee_fee;
+        $apiKey = Configuration::get('blockbee_api_key');
 
         $fee = !empty($sessionFee) ? $sessionFee : 0;
 
@@ -58,16 +59,15 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
         $currency = $this->context->currency;
 
         $disableConversion = Configuration::get('blockbee_disable_conversion') === '0' ? false : true;
-        $info = BlockBeeHelper::get_info($selected);
+        $info = BlockBeeHelper::get_info($selected, false, $apiKey);
         $minTx = (float) $info->minimum_transaction_coin;
 
-        $cryptoTotal = BlockBeeHelper::sig_fig(BlockBeeHelper::get_conversion($currency->iso_code, $selected, $total, $disableConversion), 6);
+        $cryptoTotal = BlockBeeHelper::sig_fig(BlockBeeHelper::get_conversion($currency->iso_code, $selected, $total, $disableConversion, $apiKey), 6);
 
         if ($cryptoTotal < $minTx) {
             exit($this->module->l('Value too low, minimum is.', 'validation')) . $minTx;
         }
 
-        $apiKey = Configuration::get('blockbee_api_key');
 
         if (empty($apiKey)) {
             exit($this->module->l('There\'s was an error with this payment. Please try again.', 'validation'));
