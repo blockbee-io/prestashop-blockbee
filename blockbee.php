@@ -166,9 +166,9 @@ class blockbee extends PaymentModule
 
             // Update the database table with the selected currencies. If row doesn't exist, create new
             if (empty($db->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'blockbee_coins` WHERE id=1'))) {
-                $db->Execute('INSERT INTO `' . _DB_PREFIX_ . "blockbee_coins` (`id`, `coins`) VALUES (1, '" . json_encode($save_coins) . "')");
+                $db->Execute('INSERT INTO `' . _DB_PREFIX_ . "blockbee_coins` (`id`, `coins`) VALUES (1, '" . pSQL(json_encode($save_coins)) . "')");
             } else {
-                $db->Execute('UPDATE `' . _DB_PREFIX_ . "blockbee_coins` SET coins='" . json_encode($save_coins) . "' WHERE id=1");
+                $db->Execute('UPDATE `' . _DB_PREFIX_ . "blockbee_coins` SET coins='" . pSQL(json_encode($save_coins)) . "' WHERE id=1");
             }
 
             Configuration::updateValue('blockbee_active', $active);
@@ -810,12 +810,12 @@ class blockbee extends PaymentModule
     {
         $db = Db::getInstance();
 
-        $db->Execute('INSERT INTO `' . _DB_PREFIX_ . 'blockbee_order` (`order_id`, `response`) VALUES (' . $order_id . ", '" . $params . "')");
+        $db->Execute('INSERT INTO `' . _DB_PREFIX_ . 'blockbee_order` (`order_id`, `response`) VALUES (' . (int) $order_id . ", '" . pSQL($params) . "')");
     }
 
     public static function getPaymentResponse($orderId)
     {
-        return Db::getInstance()->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'blockbee_order` WHERE order_id=' . $orderId)['response'];
+        return Db::getInstance()->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'blockbee_order` WHERE order_id=' . (int) $orderId)['response'];
     }
 
     public static function updatePaymentResponse($order_id, $param, $value)
@@ -827,7 +827,7 @@ class blockbee extends PaymentModule
             $paymentData = json_encode($metaData);
 
             $db = Db::getInstance();
-            $db->Execute('UPDATE `' . _DB_PREFIX_ . "blockbee_order` SET response='" . $paymentData . "' WHERE order_id=" . $order_id);
+            $db->Execute('UPDATE `' . _DB_PREFIX_ . "blockbee_order` SET response='" . pSQL($paymentData) . "' WHERE order_id=" . (int) $order_id);
         }
     }
 
