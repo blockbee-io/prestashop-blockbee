@@ -744,7 +744,7 @@ class blockbee extends PaymentModule
 
         foreach (json_decode(Configuration::get('blockbee_coins_cache'), true) as $ticker => $coin) {
             foreach ($selected as $selected_coin) {
-                if ((string)$ticker === (string)$selected_coin) {
+                if ((string) $ticker === (string) $selected_coin) {
                     if (!empty(Configuration::get('blockbee_api_key'))) {
                         $coins[] = [
                             'ticker' => $ticker,
@@ -889,7 +889,7 @@ class blockbee extends PaymentModule
                     $already_paid = $calc['already_paid'];
 
                     if ($value_refresh !== 0 && $last_price_update + $value_refresh <= time()) {
-                        if ((float)$remaining === (float)$remaining_pending) {
+                        if ($remaining === $remaining_pending) {
                             $blockbee_coin = $metaData['blockbee_currency'];
 
                             $crypto_total = BlockBeeHelper::sig_fig(BlockBeeHelper::get_conversion($currency, $blockbee_coin, $order['total_paid'], $disableConversion, $apiKey), 6);
@@ -1039,7 +1039,7 @@ class blockbee extends PaymentModule
             $order = $params['order'];
         }
 
-        if ($order->module !== 'blockbee') {
+        if ($order->module != 'blockbee') {
             return;
         }
 
