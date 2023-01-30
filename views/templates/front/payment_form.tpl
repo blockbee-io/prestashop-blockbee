@@ -15,7 +15,6 @@
  *  @copyright  2022 BlockBee
  *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
  *}
-
 <form action="{$action}" id="payment-form">
     <p>
         <select class="form-control form-control-select" id="blockbee_coin" name="blockbee_coin">
@@ -35,7 +34,8 @@
     </div>
 </form>
 <script>
-    const fee_url = '{$fee}'
+    const blockbee_fee_url = new URL(window.location.protocol + '{url entity='module' name='blockbee' controller='fee'}')
+
     document.getElementById('blockbee_coin').addEventListener('change', function () {
         let val = this.value;
         const payment_fee = document.getElementById('blockbee_fee');
@@ -43,19 +43,20 @@
         const confirmButton = buttonContainer.querySelector('.ps-shown-by-js');
 
         confirmButton.style.display = 'none';
-
-        fetch(fee_url + '?blockbee_coin=' + val)
+        blockbee_fee_url.searchParams.append('blockbee_coin', val)
+        fetch(blockbee_fee_url)
             .then(function (response) {
                 return response.json();
             })
             .then(function (data) {
                 confirmButton.style.display = 'block';
-                if (data.fee === 0) {
+                if (Number(data.fee) === 0) {
                     confirmButton.style.display = 'block';
+                    payment_fee.style.display = 'none';
                     return;
                 }
-                document.getElementById('blockbee_payment_fee').innerHTML = data.fee;
-                document.getElementById('blockbee_payment_total').innerHTML = data.total;
+                document.getElementById('blockbee_payment_fee').innerHTML = data.fee + ' ' + data.simbCurrency;
+                document.getElementById('blockbee_payment_total').innerHTML = data.total + ' ' + data.simbCurrency;
                 payment_fee.style.display = 'block';
             });
     });

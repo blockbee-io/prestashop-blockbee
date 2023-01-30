@@ -1,4 +1,5 @@
 <?php
+
 /**
  * 2022 BlockBee
  *
@@ -23,7 +24,6 @@ if (!defined('_PS_VERSION_')) {
 class blockbee extends PaymentModule
 {
     protected $_html = '';
-    protected $_postErrors = [];
 
     public $details;
     public $owner;
@@ -36,8 +36,8 @@ class blockbee extends PaymentModule
     {
         $this->name = 'blockbee';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.0';
-        $this->ps_versions_compliancy = ['min' => '1.7', 'max' => '1.7.9.99'];
+        $this->version = '1.1.0';
+        $this->ps_versions_compliancy = ['min' => '1.7', 'max' => '8.9.9'];
         $this->author = 'BlockBee';
         $this->controllers = ['state', 'validation', 'callback', 'success', 'cronjob', 'fee'];
         $this->module_key = '47cc969f06561eca622b85d1df87b189';
@@ -60,7 +60,8 @@ class blockbee extends PaymentModule
     public function install()
     {
         $db = Db::getInstance();
-        if (!parent::install() ||
+        if (
+            !parent::install() ||
             !$this->registerHook('paymentOptions') ||
             !$this->registerHook('paymentReturn') ||
             !$this->registerHook('displayAdminOrderTabOrder') ||
@@ -89,12 +90,12 @@ class blockbee extends PaymentModule
     public function uninstall()
     {
         parent::uninstall() &&
-        $this->unregisterHook('paymentOptions') &&
-        $this->unregisterHook('paymentReturn') &&
-        $this->unregisterHook('displayAdminOrderTabOrder') &&
-        $this->unregisterHook('displayAdminOrderTabLink') &&
-        $this->unregisterHook('displayAdminOrderTabContent') &&
-        Configuration::updateValue('blockbee_active', 0);
+            $this->unregisterHook('paymentOptions') &&
+            $this->unregisterHook('paymentReturn') &&
+            $this->unregisterHook('displayAdminOrderTabOrder') &&
+            $this->unregisterHook('displayAdminOrderTabLink') &&
+            $this->unregisterHook('displayAdminOrderTabContent') &&
+            Configuration::updateValue('blockbee_active', 0);
 
         return true;
     }
@@ -656,19 +657,33 @@ class blockbee extends PaymentModule
         $coins_db = $db->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'blockbee_coins` WHERE id=1');
 
         // Load current value into the form
-        $helper->fields_value['blockbee_active'] = empty(Tools::getValue('blockbee_active', Configuration::get('blockbee_active'))) ? 0 : Tools::getValue('blockbee_active', Configuration::get('blockbee_active'));
-        $helper->fields_value['blockbee_checkout_title'] = empty(Tools::getValue('blockbee_checkout_title', Configuration::get('blockbee_checkout_title'))) ? 'Cryptocurrency' : Tools::getValue('blockbee_checkout_title', Configuration::get('blockbee_checkout_title'));
-        $helper->fields_value['blockbee_qrcode_size'] = empty(Tools::getValue('blockbee_qrcode_size', Configuration::get('blockbee_qrcode_size'))) ? '300' : Tools::getValue('blockbee_qrcode_size', Configuration::get('blockbee_qrcode_size'));
-        $helper->fields_value['blockbee_api_key'] = Tools::getValue('blockbee_api_key', Configuration::get('blockbee_api_key'));
-        $helper->fields_value['blockbee_add_blockchain_fee'] = empty(Tools::getValue('blockbee_add_blockchain_fee', Configuration::get('blockbee_add_blockchain_fee'))) ? 1 : Tools::getValue('blockbee_add_blockchain_fee', Configuration::get('blockbee_add_blockchain_fee'));
-        $helper->fields_value['blockbee_fee_order_percentage'] = empty(Tools::getValue('blockbee_fee_order_percentage', Configuration::get('blockbee_fee_order_percentage'))) && Tools::getValue('blockbee_fee_order_percentage', Configuration::get('blockbee_fee_order_percentage')) !== 0 ? '0' : Tools::getValue('blockbee_fee_order_percentage', Configuration::get('blockbee_fee_order_percentage'));
-        $helper->fields_value['blockbee_show_branding'] = empty(Tools::getValue('blockbee_show_branding', Configuration::get('blockbee_show_branding'))) ? 1 : Tools::getValue('blockbee_show_branding', Configuration::get('blockbee_show_branding'));
-        $helper->fields_value['blockbee_qrcode_default'] = empty(Tools::getValue('blockbee_qrcode_default', Configuration::get('blockbee_qrcode_default'))) ? 1 : Tools::getValue('blockbee_qrcode_default', Configuration::get('blockbee_qrcode_default'));
-        $helper->fields_value['blockbee_color_scheme'] = Tools::getValue('blockbee_color_scheme', Configuration::get('blockbee_color_scheme'));
-        $helper->fields_value['blockbee_refresh_value_interval'] = empty(Tools::getValue('blockbee_refresh_value_interval', Configuration::get('blockbee_refresh_value_interval'))) && Tools::getValue('blockbee_refresh_value_interval', Configuration::get('blockbee_refresh_value_interval')) !== '0' ? '0' : Tools::getValue('blockbee_refresh_value_interval', Configuration::get('blockbee_refresh_value_interval'));
-        $helper->fields_value['blockbee_order_cancelation_timeout'] = empty(Tools::getValue('blockbee_order_cancelation_timeout', Configuration::get('blockbee_order_cancelation_timeout'))) && Tools::getValue('blockbee_order_cancelation_timeout', Configuration::get('blockbee_order_cancelation_timeout')) !== '0' ? '0' : Tools::getValue('blockbee_order_cancelation_timeout', Configuration::get('blockbee_order_cancelation_timeout'));
-        $helper->fields_value['blockbee_disable_conversion'] = Tools::getValue('blockbee_disable_conversion', Configuration::get('blockbee_disable_conversion'));
-        $helper->fields_value['blockbee_qrcode_setting'] = Tools::getValue('blockbee_qrcode_setting', Configuration::get('blockbee_qrcode_setting'));
+        $blockbee_active = Tools::getValue('blockbee_active', Configuration::get('blockbee_active'));
+        $blockbee_checkout_title = Tools::getValue('blockbee_checkout_title', Configuration::get('blockbee_checkout_title'));
+        $blockbee_qrcode_size = Tools::getValue('blockbee_qrcode_size', Configuration::get('blockbee_qrcode_size'));
+        $blockbee_api_key = Tools::getValue('blockbee_api_key', Configuration::get('blockbee_api_key'));
+        $blockbee_add_blockchain_fee = Tools::getValue('blockbee_add_blockchain_fee', Configuration::get('blockbee_add_blockchain_fee'));
+        $blockbee_fee_order_percentage = Tools::getValue('blockbee_fee_order_percentage', Configuration::get('blockbee_fee_order_percentage'));
+        $blockbee_show_branding = Tools::getValue('blockbee_show_branding', Configuration::get('blockbee_show_branding'));
+        $blockbee_qrcode_default = Tools::getValue('blockbee_qrcode_default', Configuration::get('blockbee_qrcode_default'));
+        $blockbee_color_scheme = Tools::getValue('blockbee_color_scheme', Configuration::get('blockbee_color_scheme'));
+        $blockbee_refresh_value_interval = Tools::getValue('blockbee_refresh_value_interval', Configuration::get('blockbee_refresh_value_interval'));
+        $blockbee_order_cancelation_timeout = Tools::getValue('blockbee_order_cancelation_timeout', Configuration::get('blockbee_order_cancelation_timeout'));
+        $blockbee_disable_conversion = Tools::getValue('blockbee_disable_conversion', Configuration::get('blockbee_disable_conversion'));
+        $blockbee_qrcode_setting = Tools::getValue('blockbee_qrcode_setting', Configuration::get('blockbee_qrcode_setting'));
+
+        $helper->fields_value['blockbee_active'] = is_bool($blockbee_active) ? 0 : $blockbee_active;
+        $helper->fields_value['blockbee_checkout_title'] = empty($blockbee_checkout_title) ? 'Cryptocurrency' : $blockbee_checkout_title;
+        $helper->fields_value['blockbee_qrcode_size'] = empty($blockbee_qrcode_size) ? '300' : $blockbee_qrcode_size;
+        $helper->fields_value['blockbee_api_key'] = $blockbee_api_key;
+        $helper->fields_value['blockbee_add_blockchain_fee'] = is_bool($blockbee_add_blockchain_fee) ? 0 : $blockbee_add_blockchain_fee;
+        $helper->fields_value['blockbee_fee_order_percentage'] = empty($blockbee_fee_order_percentage) && $blockbee_fee_order_percentage !== 0 ? '0' : $blockbee_fee_order_percentage;
+        $helper->fields_value['blockbee_show_branding'] = is_bool($blockbee_show_branding) ? 1 : $blockbee_show_branding;
+        $helper->fields_value['blockbee_qrcode_default'] = is_bool($blockbee_qrcode_default) ? 1 : $blockbee_qrcode_default;
+        $helper->fields_value['blockbee_color_scheme'] = $blockbee_color_scheme;
+        $helper->fields_value['blockbee_refresh_value_interval'] = empty($blockbee_refresh_value_interval) ? '0' : $blockbee_refresh_value_interval;
+        $helper->fields_value['blockbee_order_cancelation_timeout'] = empty($blockbee_order_cancelation_timeout) ? '0' : $blockbee_order_cancelation_timeout;
+        $helper->fields_value['blockbee_disable_conversion'] = $blockbee_disable_conversion;
+        $helper->fields_value['blockbee_qrcode_setting'] = $blockbee_qrcode_setting;
         $helper->fields_value['blockbee_coins_cache'] = json_encode($cryptocurrencies_api);
         $helper->fields_value['blockbee_cronjob_nonce'] = $default_nonce;
 
@@ -729,7 +744,7 @@ class blockbee extends PaymentModule
 
         foreach (json_decode(Configuration::get('blockbee_coins_cache'), true) as $ticker => $coin) {
             foreach ($selected as $selected_coin) {
-                if ($ticker === $selected_coin) {
+                if ((string)$ticker === (string)$selected_coin) {
                     if (!empty(Configuration::get('blockbee_api_key'))) {
                         $coins[] = [
                             'ticker' => $ticker,
@@ -751,7 +766,6 @@ class blockbee extends PaymentModule
         $this->context->smarty->assign([
             'action' => $this->context->link->getModuleLink($this->name, 'validation', [], true),
             'cryptocurrencies' => $coins,
-            'fee' => $this->context->link->getModuleLink($this->name, 'fee', [], true),
             'js_dir' => Media::getJSPath(_PS_MODULE_DIR_ . '/blockbee/views/js/blockbee_cart.js'),
         ]);
 
@@ -875,7 +889,7 @@ class blockbee extends PaymentModule
                     $already_paid = $calc['already_paid'];
 
                     if ($value_refresh !== 0 && $last_price_update + $value_refresh <= time()) {
-                        if ($remaining === $remaining_pending) {
+                        if ((float)$remaining === (float)$remaining_pending) {
                             $blockbee_coin = $metaData['blockbee_currency'];
 
                             $crypto_total = BlockBeeHelper::sig_fig(BlockBeeHelper::get_conversion($currency, $blockbee_coin, $order['total_paid'], $disableConversion, $apiKey), 6);
@@ -1025,7 +1039,7 @@ class blockbee extends PaymentModule
             $order = $params['order'];
         }
 
-        if ($order->module != 'blockbee') {
+        if ($order->module !== 'blockbee') {
             return;
         }
 

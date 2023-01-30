@@ -25,7 +25,7 @@ The BlockBee module enables your PrestaShop store to get receive payments in cry
 - (ETH) Ethereum
 - (BCH) Bitcoin Cash
 - (LTC) Litecoin
-- (XMR) Monero
+- (MATIC) Polygon
 - (TRX) Tron
 - (BNB) Binance Coin
 - (USDT) USDT
@@ -125,6 +125,10 @@ You can find more documentation about our service on our [website](https://block
 #### 1.0.0
 
 - Initial release.
+
+#### 1.1.0
+- Support for Prestashop 8
+- Minor bugfixes
 
 ### Upgrade Notice
 

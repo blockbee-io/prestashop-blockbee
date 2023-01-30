@@ -30,13 +30,13 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
 
         $metaData = json_decode(blockbee::getPaymentResponse($orderId), true);
 
-        $paid = $order->getCurrentState() === Configuration::get('PS_OS_PAYMENT') ? true : false;
+        $paid = (int) $order->getCurrentState() === (int) Configuration::get('PS_OS_PAYMENT') ? true : false;
 
-        if ($paid || $order->getCurrentOrderState()->id === (int) Configuration::get('PS_OS_CANCELED') || $callback['nonce'] !== $metaData['blockbee_nonce']) {
+        if ($paid || (int) $order->getCurrentOrderState()->id === (int) Configuration::get('PS_OS_CANCELED') || $callback['nonce'] !== $metaData['blockbee_nonce']) {
             exit('*ok*');
         }
 
-        $disableConversion = Configuration::get('blockbee_disable_conversion') === 1 ? true : false;
+        $disableConversion = (int) Configuration::get('blockbee_disable_conversion') === 1 ? true : false;
 
         $qrCodeSize = Configuration::get('blockbee_qrcode_size');
 
@@ -86,6 +86,7 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
                 $history->addWithemail();
                 $history->save();
             }
+
             exit('*ok*');
         }
 

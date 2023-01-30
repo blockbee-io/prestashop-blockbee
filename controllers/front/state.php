@@ -1,4 +1,5 @@
 <?php
+
 /**
  * 2022 BlockBee
  *
@@ -42,16 +43,16 @@ class BlockBeeStateModuleFrontController extends ModuleFrontController
         $calc = blockbee::calcOrder($historyDb, $metaData['blockbee_total'], $metaData['blockbee_total_fiat']);
 
         $alreadyPaid = $calc['already_paid'];
-        $alreadyPaidFiat = $calc['already_paid_fiat'];
+        $alreadyPaidFiat = BlockBeeHelper::sig_fig($calc['already_paid_fiat'], 2);
 
         $min_tx = (float) $metaData['blockbee_min'];
 
         $remainingPending = $calc['remaining_pending'];
-        $remainingFiat = $calc['remaining_fiat'];
+        $remainingFiat = BlockBeeHelper::sig_fig($calc['remaining_fiat'], 2);
 
         $blockbeePending = 0;
 
-        $paid = $order->getCurrentState() === Configuration::get('PS_OS_PAYMENT') ? 1 : 0;
+        $paid = (int) $order->getCurrentState() === (int) Configuration::get('PS_OS_PAYMENT') ? 1 : 0;
 
         if ($remainingPending <= 0 && !$paid) {
             $blockbeePending = 1;
@@ -70,22 +71,23 @@ class BlockBeeStateModuleFrontController extends ModuleFrontController
 
         if ($paid) {
             $remainingFiat = 0;
+            $remainingPending = 0;
         }
 
         $params = [
             'is_paid' => $paid,
             'is_pending' => $blockbeePending,
             'qr_code_value' => $metaData['blockbee_qr_code_value'],
-            'canceled' => $order->getCurrentOrderState()->id === (int) Configuration::get('PS_OS_CANCELED') ? 1 : 0,
+            'canceled' => (int) $order->getCurrentOrderState()->id === (int) Configuration::get('PS_OS_CANCELED') ? 1 : 0,
             'coin' => strtoupper($metaData['blockbee_currency']),
             'show_min_fee' => $showMinFee,
             'order_history' => $historyDb,
             'counter' => (string) $counterCalc,
             'crypto_total' => (float) $metaData['blockbee_total'],
             'already_paid' => $alreadyPaid,
-            'remaining' => $remainingPending <= 0 ? 0 : $remainingPending,
-            'fiat_remaining' => $remainingFiat <= 0 ? 0 : (float) round($remainingFiat, 2),
-            'already_paid_fiat' => (float) $alreadyPaidFiat <= 0 ? 0 : (float) $alreadyPaidFiat,
+            'remaining' => $remainingPending,
+            'fiat_remaining' => $remainingFiat,
+            'already_paid_fiat' => $alreadyPaidFiat,
             'fiat_symbol' => Currency::getDefaultCurrency()->symbol,
         ];
 

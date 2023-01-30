@@ -22,12 +22,15 @@ class BlockBeeFeeModuleFrontController extends ModuleFrontController
     {
         require_once _PS_MODULE_DIR_ . 'blockbee/lib/BlockBeeHelper.php';
 
-        $totalFee = Configuration::get('blockbee_fee_order_percentage');
+        $totalFee = (float) Configuration::get('blockbee_fee_order_percentage');
+        $blockchainFee = Configuration::get('blockbee_add_blockchain_fee');
 
-        if (empty($totalFee)) {
+        if (empty($totalFee) && $blockchainFee !== '1') {
+            $this->context->cookie->blockbee_fee = '';
             exit(json_encode([
                 'fee' => 0,
                 'total' => 0,
+                'simbCurrency' => Currency::getDefaultCurrency()->symbol,
             ]));
         }
 
@@ -35,30 +38,36 @@ class BlockBeeFeeModuleFrontController extends ModuleFrontController
 
         $total = $objCart->getOrderTotal(true, Cart::BOTH);
 
-        $feeOrder = $total * $totalFee;
+        $feeOrder = '0';
 
-        $selected = $_REQUEST['blockbee_coin'];
+        $selected = (string) $_REQUEST['blockbee_coin'];
+
         if ($selected === 'none') {
-            $this->context->cookie->blockbee_fee = round(BlockBeeHelper::sig_fig($feeOrder, 6), 2);
+            $this->context->cookie->blockbee_fee = '';
             exit(json_encode([
-                'fee' => round(BlockBeeHelper::sig_fig($feeOrder, 6), 2) . ' ' . Currency::getDefaultCurrency()->symbol,
-                'total' => round(BlockBeeHelper::sig_fig($total + $feeOrder, 6), 2) . ' ' . Currency::getDefaultCurrency()->symbol,
+                'fee' => 0,
+                'total' => 0,
+                'simbCurrency' => Currency::getDefaultCurrency()->symbol,
             ]));
+        }
+
+        if (!empty($totalFee)) {
+            $feeOrder = bcmul((string) $total, (string) $totalFee, 2);
         }
 
         $apiKey = Configuration::get('blockbee_api_key');
 
-        if (!empty($selected) && $selected != 'none' && !empty(Configuration::get('blockbee_add_blockchain_fee'))) {
+        if ($blockchainFee === '1') {
             $est = BlockBeeHelper::get_estimate($selected, $apiKey);
-
-            $feeOrder += (float) $est->{Currency::getDefaultCurrency()->iso_code};
+            $feeOrder = bcadd($feeOrder, (string) $est->{Currency::getDefaultCurrency()->iso_code}, 2);
         }
 
-        $this->context->cookie->blockbee_fee = round(BlockBeeHelper::sig_fig($feeOrder, 6), 2);
+        $this->context->cookie->blockbee_fee = BlockBeeHelper::sig_fig($feeOrder, 2);
 
         exit(json_encode([
-            'fee' => round(BlockBeeHelper::sig_fig($feeOrder, 6), 2) . ' ' . Currency::getDefaultCurrency()->symbol,
-            'total' => round(BlockBeeHelper::sig_fig($total + $feeOrder, 6), 2) . ' ' . Currency::getDefaultCurrency()->symbol,
+            'fee' => (float) BlockBeeHelper::sig_fig($feeOrder, 2),
+            'total' => bcadd((string) $total, $feeOrder, 2),
+            'simbCurrency' => Currency::getDefaultCurrency()->symbol,
         ]));
     }
 }
