@@ -55,7 +55,7 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
                 'timestamp' => time(),
                 'value_paid' => BlockBeeHelper::sig_fig($paid, 6),
                 'value_paid_fiat' => $fiat_conversion,
-                'pending' => $callback['pending'],
+                'pending' => $callback['pending']
             ];
         } else {
             $historyDb[$callback['uuid']]['pending'] = $callback['pending'];
@@ -70,7 +70,7 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
         $order->addOrderPayment(
             '0',
             $this->module->displayName,
-            $callback['coin'] . ': txid_in: ' . $callback['txid_in'],
+            $callback['coin'] . ': txid_in: ' . $callback['txid_in']
         );
 
         $calc = blockbee::calcOrder($historyDb, $metaData['blockbee_total'], $metaData['blockbee_total_fiat']);

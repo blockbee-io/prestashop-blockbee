@@ -123,12 +123,14 @@ You can find more documentation about our service on our [website](https://block
 ### Changelog
 
 #### 1.0.0
-
-- Initial release.
+* Initial release.
 
 #### 1.1.0
-- Support for Prestashop 8
-- Minor bugfixes
+* Support for Prestashop 8
+* Minor bugfixes
+
+#### 1.1.1
+* Minor bugfixes
 
 ### Upgrade Notice
 

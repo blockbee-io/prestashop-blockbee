@@ -230,7 +230,7 @@ class BlockBeeHelper
         }
 
         foreach ($params as &$val) {
-            $val = trim($val);
+            $val = is_string($val) ? trim($val) : null;
         }
 
         return $params;
@@ -277,7 +277,8 @@ class BlockBeeHelper
 
     public static function sig_fig($value, $digits)
     {
-        if (strpos((string) $value, '.') !== false) {
+        $value = (string) $value;
+        if (strpos($value, '.') !== false) {
             if ($value[0] != '-') {
                 return bcadd($value, '0.' . str_repeat('0', $digits) . '5', $digits);
             }
