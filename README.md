@@ -132,6 +132,9 @@ You can find more documentation about our service on our [website](https://block
 #### 1.1.1
 * Minor bugfixes
 
+#### 1.1.2
+* Minor bugfixes
+
 ### Upgrade Notice
 
 - No breaking changes

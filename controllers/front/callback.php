@@ -32,6 +32,10 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
 
         $paid = (int) $order->getCurrentState() === (int) Configuration::get('PS_OS_PAYMENT') ? true : false;
 
+        if ($callback['coin'] !== $metaData['blockbee_currency']) {
+            exit('*ok*');
+        }
+
         if ($paid || (int) $order->getCurrentOrderState()->id === (int) Configuration::get('PS_OS_CANCELED') || $callback['nonce'] !== $metaData['blockbee_nonce']) {
             exit('*ok*');
         }
