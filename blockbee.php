@@ -35,7 +35,7 @@ class blockbee extends PaymentModule
     {
         $this->name = 'blockbee';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.2';
+        $this->version = '1.1.3';
         $this->ps_versions_compliancy = ['min' => '1.7', 'max' => '8.9.9'];
         $this->author = 'BlockBee';
         $this->controllers = ['state', 'validation', 'callback', 'success', 'cronjob', 'fee'];
@@ -554,6 +554,18 @@ class blockbee extends PaymentModule
                                 [
                                     'id_option' => '0',
                                     'name' => $this->l('Never', '', 'en'),
+                                ],
+                                [
+                                    'id_option' => '900',
+                                    'name' => $this->l('15 Minutes', '', 'en'),
+                                ],
+                                [
+                                    'id_option' => '1800',
+                                    'name' => $this->l('30 Minutes', '', 'en'),
+                                ],
+                                [
+                                    'id_option' => '2700',
+                                    'name' => $this->l('45 Minutes', '', 'en'),
                                 ],
                                 [
                                     'id_option' => '3600',

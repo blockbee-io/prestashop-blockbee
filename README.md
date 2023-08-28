@@ -13,7 +13,7 @@ PrestaShop >= 1.7
 
 ### Description
 
-Accept payments in Bitcoin, Bitcoin Cash, Litecoin, Ethereum, Monero and IOTA directly to your crypto wallet, without any sign-ups or lengthy processes. All you need is to provide your crypto address.
+Accept payments in Bitcoin, Bitcoin Cash, Litecoin, Ethereum, USDT and Matic directly to your crypto wallet, without any sign-ups or lengthy processes. All you need is to provide your crypto address.
 
 #### Allow users to pay with crypto directly on your store
 
@@ -134,6 +134,9 @@ You can find more documentation about our service on our [website](https://block
 
 #### 1.1.2
 * Minor bugfixes
+
+#### 1.1.3
+* Add new choices for order cancellation.
 
 ### Upgrade Notice
 
