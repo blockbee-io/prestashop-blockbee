@@ -1,5 +1,5 @@
 {**
- * 2022 BlockBee
+ * 2026 BlockBee
  *
  * NOTICE OF LICENSE
  *
@@ -7,58 +7,11 @@
  * that is bundled with this package in the file LICENSE.txt.
  * It is also available through the world-wide-web at this URL:
  * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to info@blockbee.io so we can send you a copy immediately.
  *
  *  @author BlockBee <info@blockbee.io>
- *  @copyright  2022 BlockBee
+ *  @copyright  2026 BlockBee
  *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
  *}
-<form action="{$action}" id="payment-form">
-    <p>
-        <select class="form-control form-control-select" id="blockbee_coin" name="blockbee_coin">
-            <option value="none">{l s='Please select a cryptocurrency' mod='blockbee'}</option>
-            {foreach from=$cryptocurrencies key=myId item=i}
-                <option value="{$i.ticker}">{$i.coin}</option>
-            {/foreach}
-        </select>
-    </p>
-    <div id="blockbee_fee" class="definition-list additional-information" style="display: none;">
-        <dl>
-            <dt>{l s='Payment Fee' mod='blockbee'}</dt>
-            <dd id="blockbee_payment_fee"></dd>
-            <dt>{l s='Total Charged' mod='blockbee'}</dt>
-            <dd id="blockbee_payment_total"></dd>
-        </dl>
-    </div>
+<form action="{$action|escape:'htmlall':'UTF-8'}" method="post" id="blockbee-payment-form">
+    <p>{l s='You will be redirected to BlockBee to complete your payment with the cryptocurrency of your choice.' mod='blockbee'}</p>
 </form>
-<script>
-    const blockbee_fee_url = new URL(window.location.protocol + '{url entity='module' name='blockbee' controller='fee'}')
-
-    document.getElementById('blockbee_coin').addEventListener('change', function () {
-        let val = this.value;
-        const payment_fee = document.getElementById('blockbee_fee');
-        const buttonContainer = document.querySelector('.js-payment-confirmation');
-        const confirmButton = buttonContainer.querySelector('.ps-shown-by-js');
-
-        confirmButton.style.display = 'none';
-        blockbee_fee_url.searchParams.append('blockbee_coin', val)
-        fetch(blockbee_fee_url)
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (data) {
-                confirmButton.style.display = 'block';
-                if (Number(data.fee) === 0) {
-                    confirmButton.style.display = 'block';
-                    payment_fee.style.display = 'none';
-                    return;
-                }
-                document.getElementById('blockbee_payment_fee').innerHTML = data.fee + ' ' + data.simbCurrency;
-                document.getElementById('blockbee_payment_total').innerHTML = data.total + ' ' + data.simbCurrency;
-                payment_fee.style.display = 'block';
-            });
-    });
-</script>
-

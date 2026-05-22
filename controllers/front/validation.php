@@ -1,6 +1,6 @@
 <?php
 /**
- * 2022 BlockBee
+ * 2026 BlockBee
  *
  * NOTICE OF LICENSE
  *
@@ -8,74 +8,56 @@
  * that is bundled with this package in the file LICENSE.txt.
  * It is also available through the world-wide-web at this URL:
  * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to info@blockbee.io so we can send you a copy immediately.
  *
  *  @author BlockBee <info@blockbee.io>
- *  @copyright  2022 BlockBee
+ *  @copyright  2026 BlockBee
  *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
  */
+
 class BlockBeeValidationModuleFrontController extends ModuleFrontController
 {
     public function postProcess()
     {
-        require_once _PS_MODULE_DIR_ . 'blockbee/lib/BlockBeeHelper.php';
-
         $cart = $this->context->cart;
-        if ($cart->id_customer == 0 || $cart->id_address_delivery == 0 || $cart->id_address_invoice == 0 || !$this->module->active) {
+
+        if ($cart->id_customer == 0
+            || $cart->id_address_delivery == 0
+            || $cart->id_address_invoice == 0
+            || !$this->module->active) {
             Tools::redirect('index.php?controller=order&step=1');
         }
 
-        // Check that this payment option is still available in case the customer changed his address just before the end of the checkout process
         $authorized = false;
         foreach (Module::getPaymentModules() as $module) {
-            if ($module['name'] == 'blockbee') {
+            if ($module['name'] === 'blockbee') {
                 $authorized = true;
                 break;
             }
         }
-
         if (!$authorized) {
             exit($this->module->l('This payment method is not available.', 'validation'));
         }
 
-        $selected = $_REQUEST['blockbee_coin'];
-        if ($selected == 'none') {
-            exit($this->module->l('Please select a cryptocurrency.', 'validation'));
-        }
-
-        $customer = new Customer($cart->id_customer);
+        $customer = new Customer((int) $cart->id_customer);
         if (!Validate::isLoadedObject($customer)) {
             Tools::redirect('index.php?controller=order&step=1');
         }
 
-        $sessionFee = $this->context->cookie->blockbee_fee;
         $apiKey = Configuration::get('blockbee_api_key');
-
-        $fee = !empty($sessionFee) ? $sessionFee : 0;
-
-        $total = (float) $cart->getOrderTotal(true, Cart::BOTH) + $fee;
-        $currency = $this->context->currency;
-
-        $disableConversion = (string) Configuration::get('blockbee_disable_conversion') === '0' ? false : true;
-        $info = BlockBeeHelper::get_info($selected, false, $apiKey);
-        $minTx = (float) $info->minimum_transaction_coin;
-
-        $cryptoTotal = BlockBeeHelper::sig_fig(BlockBeeHelper::get_conversion($currency->iso_code, $selected, $total, $disableConversion, $apiKey), 6);
-
-        if ($cryptoTotal < $minTx) {
-            exit($this->module->l('Value too low, minimum is.' . $minTx, 'validation'));
-        }
-
         if (empty($apiKey)) {
-            exit($this->module->l('There\'s was an error with this payment. Please try again.', 'validation'));
+            PrestaShopLogger::addLog('[BlockBee] API key not configured at checkout time', 3);
+            exit($this->module->l('Payment is currently unavailable. Please try again later.', 'validation'));
         }
 
-        // Actually create order in prestashop
+        $currency = $this->context->currency;
+        $total = (float) $cart->getOrderTotal(true, Cart::BOTH);
+
+        // Create the PrestaShop order up-front in the "waiting" state so we have an
+        // id_order to embed in the BlockBee notify/redirect URLs. The state will be
+        // moved to PS_OS_PAYMENT by the signed webhook.
         $this->module->validateOrder(
             (int) $cart->id,
-            (int) Configuration::get('BLOCKBEE_WAITING'),
+            (int) Configuration::get(blockbee::BLOCKBEE_WAITING),
             $total,
             $this->module->displayName,
             null,
@@ -85,48 +67,52 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
             $customer->secure_key
         );
 
-        $qrCodeSize = Configuration::get('blockbee_qrcode_size');
-        $nonce = blockbee::generateNonce();
-        $orderId = $this->module->currentOrder;
-
-        $callbackUrl = _PS_BASE_URL_ . __PS_BASE_URI__ . 'module/blockbee/callback?order=' . $orderId . '&nonce=' . $nonce;
-
-        $api = new BlockBeeHelper($selected, $apiKey, $callbackUrl, [], true);
-
-        $addressIn = $api->get_address();
-
-        if (empty($addressIn)) {
-            exit($this->module->l('There\'s was an error with this payment. Please try again.', 'validation'));
+        $orderId = (int) $this->module->currentOrder;
+        if ($orderId <= 0) {
+            PrestaShopLogger::addLog('[BlockBee] validateOrder did not produce a currentOrder', 3);
+            exit($this->module->l('Could not create your order. Please try again.', 'validation'));
         }
 
-        $qrCodeDataValue = $api->get_qrcode($cryptoTotal, $qrCodeSize);
-        $qrCodeData = $api->get_qrcode('', $qrCodeSize);
-        $paymentURL = _PS_BASE_URL_ . __PS_BASE_URI__ . 'module/blockbee/success?order_id=' . $this->module->currentOrder;
+        // Notify URL — order_id here is just a hint; the authoritative correlation
+        // comes from payment_id inside the signed webhook body.
+        $notifyUrl = $this->context->link->getModuleLink('blockbee', 'callback', [
+            'order_id' => $orderId,
+        ], true);
 
-        $paymentData = [
-            'blockbee_nonce' => $nonce,
-            'blockbee_address' => $addressIn,
-            'blockbee_total' => $cryptoTotal,
-            'blockbee_total_fiat' => $total,
-            'blockbee_currency' => $selected,
-            'blockbee_qr_code_value' => $qrCodeDataValue['qr_code'],
-            'blockbee_qr_code' => $qrCodeData['qr_code'],
-            'blockbee_last_price_update' => time(),
-            'blockbee_min' => $minTx,
-            'blockbee_fee' => $fee,
-            'blockbee_order_created' => time(),
-            'blockbee_history' => [],
-            'blockbee_payment_url' => $paymentURL,
-        ];
-
-        blockbee::addPaymentResponse($orderId, json_encode($paymentData));
-
-        $this->context->smarty->assign([
-            'params' => $_REQUEST,
+        $redirectUrl = $this->context->link->getPageLink('order-confirmation', true, null, [
+            'id_cart' => (int) $cart->id,
+            'id_module' => (int) $this->module->id,
+            'id_order' => $orderId,
+            'key' => $customer->secure_key,
         ]);
 
-        blockbee::sendMail($orderId);
+        $params = [
+            'redirect_url' => $redirectUrl,
+            'notify_url' => $notifyUrl,
+            'value' => number_format($total, 2, '.', ''),
+            'currency' => strtolower($currency->iso_code),
+            'item_description' => 'Order #' . $orderId,
+            'post' => '1', // POST webhooks → signature covers the raw body.
+        ];
 
-        Tools::redirectLink($paymentURL);
+        $response = BlockBeeHelper::checkout_request($params, $apiKey);
+
+        if (!is_array($response) || ($response['status'] ?? null) !== 'success' || empty($response['payment_url']) || empty($response['payment_id'])) {
+            PrestaShopLogger::addLog(
+                '[BlockBee] checkout_request failed for order ' . $orderId . ' — '
+                . (is_array($response) ? json_encode($response) : 'no response'),
+                3
+            );
+            exit($this->module->l('Could not create a BlockBee payment. Please try again.', 'validation'));
+        }
+
+        blockbee::savePayment($orderId, (string) $response['payment_id'], [
+            'payment_url' => $response['payment_url'],
+            'created_at' => time(),
+            'value' => $params['value'],
+            'currency' => $params['currency'],
+        ]);
+
+        Tools::redirect($response['payment_url']);
     }
 }

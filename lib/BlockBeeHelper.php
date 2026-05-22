@@ -1,6 +1,6 @@
 <?php
 /**
- * 2022 BlockBee
+ * 2026 BlockBee
  *
  * NOTICE OF LICENSE
  *
@@ -8,322 +8,164 @@
  * that is bundled with this package in the file LICENSE.txt.
  * It is also available through the world-wide-web at this URL:
  * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to info@blockbee.io so we can send you a copy immediately.
  *
  *  @author BlockBee <info@blockbee.io>
- *  @copyright  2022 BlockBee
+ *  @copyright  2026 BlockBee
  *  @license    http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
  */
+
+if (!defined('_PS_VERSION_')) {
+    exit;
+}
+
 class BlockBeeHelper
 {
-    private static $base_url = 'https://api.blockbee.io';
-    private $payment_address = null;
-    private $callback_url = null;
-    private $coin = null;
-    private $pending = false;
-    private $parameters = [];
-    private $api_key = null;
+    private const BASE_URL = 'https://api.blockbee.io';
+    private const HTTP_TIMEOUT = 30;
+    // Pubkey is reused signature-after-signature; refresh at most once a day
+    // unless verification fails (then we force-refresh and retry).
+    private const PUBKEY_REFRESH_INTERVAL = 86400;
 
-    public function __construct($coin, $api_key, $callback_url, $parameters = [], $pending = false)
+    /**
+     * Create a hosted checkout payment on BlockBee.
+     *
+     * @param array  $params  Must include redirect_url, notify_url, value. Optional: currency, item_description, post, expire_at.
+     * @param string $api_key Merchant API key.
+     *
+     * @return array Decoded JSON response. On error, an array shaped like ['status' => 'error', 'error' => '...'].
+     */
+    public static function checkout_request(array $params, $api_key)
     {
-        $this->callback_url = $callback_url;
-        $this->api_key = $api_key;
-        $this->coin = $coin;
-        $this->pending = $pending ? 1 : 0;
-        $this->parameters = $parameters;
-    }
-
-    public function get_address()
-    {
-        if (empty($this->coin) || empty($this->callback_url)) {
-            return null;
-        }
-
-        $api_key = $this->api_key;
-
         if (empty($api_key)) {
+            return ['status' => 'error', 'error' => 'Missing API key'];
+        }
+
+        $query = array_merge(['apikey' => $api_key], $params);
+        $url = self::BASE_URL . '/checkout/request/?' . http_build_query($query);
+
+        $raw = self::http_get($url);
+        if ($raw === null) {
+            return ['status' => 'error', 'error' => 'No response from BlockBee'];
+        }
+
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            return ['status' => 'error', 'error' => 'Invalid JSON response from BlockBee'];
+        }
+
+        return $data;
+    }
+
+    /**
+     * Verify a BlockBee webhook signature.
+     *
+     * For POST webhooks the signed payload is the raw request body.
+     * For GET webhooks the signed payload is the full reconstructed URL.
+     *
+     * If verification fails we refresh the cached public key once (to handle key
+     * rotation) and retry before giving up.
+     */
+    public static function verify_signature($signed_data, $signature_b64)
+    {
+        if (!is_string($signed_data) || !is_string($signature_b64) || $signature_b64 === '') {
+            return false;
+        }
+
+        $signature = base64_decode($signature_b64, true);
+        if ($signature === false || $signature === '') {
+            return false;
+        }
+
+        $pubkey = self::get_pubkey();
+        if (!empty($pubkey) && self::openssl_verify_pem($signed_data, $signature, $pubkey) === 1) {
+            return true;
+        }
+
+        // Cached key may be stale (rotated upstream). Force-refresh once.
+        $pubkey = self::refresh_pubkey();
+        if (empty($pubkey)) {
+            return false;
+        }
+
+        return self::openssl_verify_pem($signed_data, $signature, $pubkey) === 1;
+    }
+
+    /**
+     * Returns the cached BlockBee public key (PEM) if fresh, otherwise refreshes.
+     */
+    public static function get_pubkey()
+    {
+        $cached = Configuration::get('blockbee_pubkey');
+        $cached_at = (int) Configuration::get('blockbee_pubkey_at');
+
+        if (!empty($cached) && (time() - $cached_at) < self::PUBKEY_REFRESH_INTERVAL) {
+            return $cached;
+        }
+
+        $fresh = self::refresh_pubkey();
+
+        return $fresh !== null ? $fresh : ($cached !== false ? $cached : null);
+    }
+
+    /**
+     * Force-fetch the public key from BlockBee and cache it.
+     */
+    public static function refresh_pubkey()
+    {
+        $raw = self::http_get(self::BASE_URL . '/pubkey/');
+        if ($raw === null) {
             return null;
         }
 
-        $callback_url = $this->callback_url;
-        if (!empty($this->parameters)) {
-            $req_parameters = http_build_query($this->parameters);
-            $callback_url = "{$this->callback_url}?{$req_parameters}";
-        }
-
-        $blockbee_params = [
-            'apikey' => $api_key,
-            'callback' => $callback_url,
-            'pending' => $this->pending,
-            'convert' => 1,
-        ];
-
-        $response = BlockBeeHelper::_request($this->coin, 'create', $blockbee_params);
-
-        if ($response->status == 'success') {
-            $this->payment_address = $response->address_in;
-
-            return $response->address_in;
-        }
-
-        return null;
-    }
-
-    public function checklogs()
-    {
-        if (empty($this->coin) || empty($this->callback_url)) {
+        $data = json_decode($raw, true);
+        if (!is_array($data) || empty($data['pubkey'])) {
             return null;
         }
 
-        $api_key = $this->api_key;
+        Configuration::updateValue('blockbee_pubkey', $data['pubkey']);
+        Configuration::updateValue('blockbee_pubkey_at', time());
 
-        $params = [
-            'callback' => $this->callback_url,
-            'apikey' => $api_key,
-        ];
-
-        $response = BlockBeeHelper::_request($this->coin, 'logs', $params);
-
-        if ($response->status == 'success') {
-            return $response;
-        }
-
-        var_dump($response);
-
-        return null;
+        return $data['pubkey'];
     }
 
-    public function get_qrcode($value, $size)
+    private static function openssl_verify_pem($data, $signature, $pubkey_pem)
     {
-        if (empty($this->coin)) {
+        $key = openssl_pkey_get_public($pubkey_pem);
+        if ($key === false) {
+            return -1;
+        }
+
+        return openssl_verify($data, $signature, $key, OPENSSL_ALGO_SHA256);
+    }
+
+    private static function http_get($url)
+    {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_TIMEOUT, self::HTTP_TIMEOUT);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+        // TLS verification stays on (defaults: SSL_VERIFYHOST=2, SSL_VERIFYPEER=1).
+
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($response === false || $err !== '' || $code >= 400) {
+            self::log(sprintf('HTTP GET failed (code=%d, err=%s) — %s', $code, $err, $url));
+
             return null;
         }
 
-        if (empty($value)) {
-            $params = [
-                'address' => $this->payment_address,
-                'size' => $size,
-                'apikey' => $this->api_key,
-            ];
-        } else {
-            $params = [
-                'address' => $this->payment_address,
-                'value' => $value,
-                'size' => $size,
-                'apikey' => $this->api_key,
-            ];
-        }
-
-        $response = BlockBeeHelper::_request($this->coin, 'qrcode', $params);
-
-        if ($response->status == 'success') {
-            return ['qr_code' => $response->qr_code, 'uri' => $response->payment_uri];
-        }
-
-        return null;
+        return (string) $response;
     }
 
-    public static function get_static_qrcode($address, $coin, $value, $api_key, $size = 300)
+    private static function log($message)
     {
-        if (empty($address)) {
-            return null;
-        }
-
-        if (!empty($value)) {
-            $params = [
-                'address' => $address,
-                'value' => $value,
-                'size' => $size,
-                'apikey' => $api_key,
-            ];
-        } else {
-            $params = [
-                'address' => $address,
-                'size' => $size,
-                'apikey' => $api_key,
-            ];
-        }
-
-        $response = BlockBeeHelper::_request($coin, 'qrcode', $params);
-
-        if ($response->status == 'success') {
-            return ['qr_code' => $response->qr_code, 'uri' => $response->payment_uri];
-        }
-
-        return null;
-    }
-
-    public static function get_supported_coins()
-    {
-        $info = BlockBeeHelper::get_info(null, true, '');
-
-        if (empty($info)) {
-            return null;
-        }
-
-        unset($info['fee_tiers']);
-
-        $coins = [];
-
-        foreach ($info as $chain => $data) {
-            $is_base_coin = in_array('ticker', array_keys($data));
-            if ($is_base_coin) {
-                $coins[$chain] = $data['coin'];
-                continue;
-            }
-
-            $base_ticker = "{$chain}_";
-            foreach ($data as $token => $subdata) {
-                $chain_upper = strtoupper($chain);
-
-                $coins[$base_ticker . $token] = "{$subdata['coin']} ({$chain_upper})";
-            }
-        }
-
-        return $coins;
-    }
-
-    public static function get_info($coin = null, $assoc = false, $api_key = '')
-    {
-        $params = [];
-
-        if (empty($coin)) {
-            $params['prices'] = '0';
-        }
-
-        if (!empty($api_key)) {
-            $params['apikey'] = $api_key;
-        }
-
-        $response = BlockBeeHelper::_request($coin, 'info', $params, $assoc);
-
-        if (empty($coin) || $response->status == 'success') {
-            return $response;
-        }
-
-        return null;
-    }
-
-    public static function process_callback($_get)
-    {
-        $params = [
-            'address_in' => $_get['address_in'],
-            'address_out' => $_get['address_out'],
-            'txid_in' => $_get['txid_in'],
-            'txid_out' => isset($_get['txid_out']) ? $_get['txid_out'] : null,
-            'confirmations' => $_get['confirmations'],
-            'value' => $_get['value'],
-            'value_coin' => $_get['value_coin'],
-            'value_forwarded' => isset($_get['value_forwarded']) ? $_get['value_forwarded'] : null,
-            'value_forwarded_coin' => isset($_get['value_forwarded_coin']) ? $_get['value_forwarded_coin'] : null,
-            'coin' => $_get['coin'],
-            'pending' => isset($_get['pending']) ? $_get['pending'] : false,
-        ];
-
-        foreach ($_get as $k => $v) {
-            if (isset($params[$k])) {
-                continue;
-            }
-            $params[$k] = $_get[$k];
-        }
-
-        foreach ($params as &$val) {
-            $val = is_string($val) ? trim($val) : null;
-        }
-
-        return $params;
-    }
-
-    public static function get_conversion($from, $to, $value, $disable_conversion, $api_key)
-    {
-        if ($disable_conversion) {
-            return $value;
-        }
-
-        $params = [
-            'from' => $from,
-            'to' => $to,
-            'value' => $value,
-            'apikey' => $api_key,
-        ];
-
-        $response = BlockBeeHelper::_request('', 'convert', $params);
-
-        if ($response->status == 'success') {
-            return $response->value_coin;
-        }
-
-        return null;
-    }
-
-    public static function get_estimate($coin, $api_key)
-    {
-        $params = [
-            'addresses' => 1,
-            'priority' => 'default',
-            'apikey' => $api_key,
-        ];
-
-        $response = BlockBeeHelper::_request($coin, 'estimate', $params);
-
-        if ($response->status == 'success') {
-            return $response->estimated_cost_currency;
-        }
-
-        return null;
-    }
-
-    public static function sig_fig($value, $digits)
-    {
-        $value = (string) $value;
-        if (strpos($value, '.') !== false) {
-            if ($value[0] != '-') {
-                return bcadd($value, '0.' . str_repeat('0', $digits) . '5', $digits);
-            }
-
-            return bcsub($value, '0.' . str_repeat('0', $digits) . '5', $digits);
-        }
-
-        return $value;
-    }
-
-    private static function _request($coin, $endpoint, $params = [], $assoc = false)
-    {
-        $base_url = BlockBeeHelper::$base_url;
-
-        if (!empty($params)) {
-            $data = http_build_query($params);
-        }
-
-        if (!empty($coin)) {
-            $coin = str_replace('_', '/', $coin);
-            $url = "{$base_url}/{$coin}/{$endpoint}/";
-        } else {
-            $url = "{$base_url}/{$endpoint}/";
-        }
-
-        if (!empty($data)) {
-            $url .= "?{$data}";
-        }
-
-        $curl = curl_init($url);
-        curl_setopt($curl, CURLOPT_HEADER, 0);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-
-        $response = curl_exec($curl);
-
-        $json = [];
-
-        if (curl_error($curl)) {
-            $json['error'] = 'ERROR: ' . curl_errno($curl) . '::' . curl_error($curl);
-
-            return $json;
-        } elseif ($response) {
-            return json_decode($response, $assoc);
+        if (class_exists('PrestaShopLogger')) {
+            PrestaShopLogger::addLog('[BlockBee] ' . $message, 2);
         }
     }
 }

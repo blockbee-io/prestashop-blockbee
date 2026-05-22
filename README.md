@@ -7,8 +7,8 @@ Accept cryptocurrency payments on your PrestaShop website
 ### Requirements:
 
 ```
-PHP >= 7.3
-PrestaShop >= 1.7
+PHP >= 7.4  (or whatever your PrestaShop version requires — PS 9 needs PHP 8.1+)
+PrestaShop >= 1.7  (tested on 8.x and 9.x)
 ```
 
 ### Description
@@ -25,7 +25,7 @@ The BlockBee module enables your PrestaShop store to get receive payments in cry
 - (ETH) Ethereum
 - (BCH) Bitcoin Cash
 - (LTC) Litecoin
-- (MATIC) Polygon
+- (POL) Polygon
 - (TRX) Tron
 - (BNB) Binance Coin
 - (USDT) USDT
@@ -42,15 +42,38 @@ Supported currencies for automatic exchange rates are:
 - (USD) United States Dollar
 - (EUR) Euro
 - (GBP) Great Britain Pound
-- (JPY) Japanese Yen
-- (CNY) Chinese Yuan
-- (INR) Indian Rupee
 - (CAD) Canadian Dollar
+- (JPY) Japanese Yen
+- (AED) UAE Dollar
+- (MYR) Malaysian Ringgit
+- (IDR) Indonesian Rupiah
+- (THB) Thai Baht
+- (CHF) Swiss Franc
+- (SGD) Singapore Dollar
+- (RUB) Russian Ruble
+- (ZAR) South African Rand
+- (TRY) Turkish Lira
+- (LKR) Sri Lankan Rupee
+- (RON) Romanian Leu
+- (BGN) Bulgarian Lev
+- (HUF) Hungarian Forint
+- (CZK) Czech Koruna
+- (PHP) Philippine Peso
+- (PLN) Poland Zloti
+- (UGX) Uganda Shillings
+- (MXN) Mexican Peso
+- (INR) Indian Rupee
 - (HKD) Hong Kong Dollar
+- (CNY) Chinese Yuan
 - (BRL) Brazilian Real
 - (DKK) Danish Krone
-- (MXN) Mexican Peso
-- (AED) United Arab Emirates Dirham
+- (TWD) New Taiwan Dollar
+- (AUD) Australian Dollar
+- (NGN) Nigerian Naira
+- (SEK) Swedish Krona
+- (NOK) Norwegian Krone
+- (UAH) Ukrainian Hryvnia
+- (VND) Vietnamese Dong
 
 If your WooCommerce's currency is none of the above, the exchange rates will default to USD.
 If you're using WooCommerce in a different currency not listed here and need support, please [contact us](https://blockbee.io/contacts/) via our live chat.
@@ -122,22 +145,28 @@ You can find more documentation about our service on our [website](https://block
 
 ### Changelog
 
-#### 1.0.0
-* Initial release.
+#### 2.0.0
+* Rewrite on top of BlockBee Checkout Payments — customers are now redirected to `pay.blockbee.io` to pay
+* Webhook signature verification added
+* PrestaShop 8 and 9 compatibility
+* Cronjob no longer needed
 
-#### 1.1.0
-* Support for Prestashop 8
+#### 1.1.3
+* Add new choices for order cancellation.
+
+#### 1.1.2
 * Minor bugfixes
 
 #### 1.1.1
 * Minor bugfixes
 
-#### 1.1.2
+#### 1.1.0
+* Support for Prestashop 8
 * Minor bugfixes
 
-#### 1.1.3
-* Add new choices for order cancellation.
+#### 1.0.0
+* Initial release.
 
 ### Upgrade Notice
 
-- No breaking changes
+- 2.0.0 contains breaking changes (architecture rewrite). Cancel pending 1.x orders and remove any cronjob entry before upgrading.
