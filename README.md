@@ -145,6 +145,9 @@ You can find more documentation about our service on our [website](https://block
 
 ### Changelog
 
+#### 2.1.1
+* Bugfixes and security hardening
+
 #### 2.0.0
 * Rewrite on top of BlockBee Checkout Payments — customers are now redirected to `pay.blockbee.io` to pay
 * Webhook signature verification added

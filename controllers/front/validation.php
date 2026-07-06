@@ -38,6 +38,15 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
             exit($this->module->l('This payment method is not available.', 'validation'));
         }
 
+        $expectedToken = blockbee::csrfToken((int) $cart->id, (int) $cart->id_customer);
+        $givenToken = (string) Tools::getValue('bb_token');
+        if (Tools::strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST'
+            || $givenToken === ''
+            || !hash_equals($expectedToken, $givenToken)) {
+            PrestaShopLogger::addLog('[BlockBee] Checkout rejected: missing/invalid CSRF token', 2);
+            Tools::redirect('index.php?controller=order&step=1');
+        }
+
         $customer = new Customer((int) $cart->id_customer);
         if (!Validate::isLoadedObject($customer)) {
             Tools::redirect('index.php?controller=order&step=1');
@@ -73,10 +82,19 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
             exit($this->module->l('Could not create your order. Please try again.', 'validation'));
         }
 
+        // Per-order unguessable secret. BlockBee echoes back every GET parameter
+        // on the callback (even for POST webhooks), so the callback handler can
+        // reject any webhook whose nonce it doesn't recognise — defence-in-depth
+        // on top of the signature check. See https://docs.blockbee.io — "Harden
+        // your callback with a secret".
+        $nonce = blockbee::generateNonce(32);
+
         // Notify URL — order_id here is just a hint; the authoritative correlation
-        // comes from payment_id inside the signed webhook body.
+        // comes from payment_id inside the signed webhook body. The nonce is the
+        // per-order secret verified in callback.php.
         $notifyUrl = $this->context->link->getModuleLink('blockbee', 'callback', [
             'order_id' => $orderId,
+            'nonce' => $nonce,
         ], true);
 
         $redirectUrl = $this->context->link->getPageLink('order-confirmation', true, null, [
@@ -111,7 +129,7 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
             'created_at' => time(),
             'value' => $params['value'],
             'currency' => $params['currency'],
-        ]);
+        ], $nonce);
 
         Tools::redirect($response['payment_url']);
     }

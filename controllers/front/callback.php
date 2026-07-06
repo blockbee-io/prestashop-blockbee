@@ -38,7 +38,10 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
         }
 
         PrestaShopLogger::addLog(
-            '[BlockBee] Webhook received: ' . json_encode($payload),
+            '[BlockBee] Webhook received: payment_id='
+            . substr((string) ($payload['payment_id'] ?? ''), 0, 64)
+            . ' is_paid=' . var_export($payload['is_paid'] ?? null, true)
+            . ' status=' . substr((string) ($payload['status'] ?? ''), 0, 32),
             1
         );
 
@@ -60,62 +63,137 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
             $this->ack();
         }
 
-        // Persist the latest payload regardless of state — useful for the admin tab.
-        blockbee::savePayment($orderId, $paymentId, $payload);
-
-        $currentState = (int) $order->getCurrentState();
-        $paidState = (int) Configuration::get('PS_OS_PAYMENT');
-
-        if ($currentState === $paidState) {
-            PrestaShopLogger::addLog('[BlockBee] Order ' . $orderId . ' already in PAYMENT state, ack', 1);
-            $this->ack();
+        // Verify the per-order nonce we embedded in the notify URL at checkout.
+        // BlockBee echoes it back as a GET parameter on every callback. Reject on
+        // empty (no stored nonce) or mismatch — constant-time compare. This is a
+        // second gate on top of the signature check so a guessed callback URL
+        // alone can never drive an order (e.g. to spoof address_out/txid).
+        $expectedNonce = isset($row['nonce']) ? (string) $row['nonce'] : '';
+        $givenNonce = isset($_GET['nonce']) ? (string) $_GET['nonce'] : '';
+        if ($expectedNonce === '' || !hash_equals($expectedNonce, $givenNonce)) {
+            $this->reject('Nonce mismatch for order ' . $orderId);
         }
 
-        $isPaid = $this->isPaid($payload);
-        if (!$isPaid) {
+        $paidState = (int) Configuration::get('PS_OS_PAYMENT');
+        $terminalStates = [
+            $paidState,
+            (int) Configuration::get('PS_OS_CANCELED'),
+            (int) Configuration::get('PS_OS_REFUND'),
+            (int) Configuration::get('PS_OS_ERROR'),
+        ];
+
+        $db = Db::getInstance();
+        $db->execute('START TRANSACTION');
+
+        $sendPaidEmail = false;
+
+        try {
+            // Take the row lock and re-read the stored payload under it.
+            $lockedRows = $db->executeS(
+                'SELECT `payload` FROM `' . _DB_PREFIX_ . 'blockbee_order` WHERE `id_order` = ' . $orderId . ' LIMIT 1 FOR UPDATE'
+            );
+            $lockedRow = !empty($lockedRows) ? $lockedRows[0] : null;
+            $storedPayload = ($lockedRow && !empty($lockedRow['payload'])) ? json_decode($lockedRow['payload'], true) : [];
+            if (!is_array($storedPayload)) {
+                $storedPayload = [];
+            }
+            $processedTxid = isset($storedPayload['blockbee_processed_txid'])
+                ? (string) $storedPayload['blockbee_processed_txid'] : '';
+
+            // Persist the latest payload for the admin tab, but carry the
+            // processed-txid marker forward so we never erase the dedupe record.
+            $toSave = $payload;
+            if ($processedTxid !== '') {
+                $toSave['blockbee_processed_txid'] = $processedTxid;
+            }
+
+            $txid = isset($payload['txid']) ? (string) $payload['txid'] : '';
+
+            // Authoritative state read under the lock.
+            $order = new Order($orderId);
+            $currentState = (int) $order->getCurrentState();
+
+            if (in_array($currentState, $terminalStates, true)) {
+                blockbee::savePayment($orderId, $paymentId, $toSave);
+                $db->execute('COMMIT');
+                PrestaShopLogger::addLog(
+                    '[BlockBee] Order ' . $orderId . ' already in terminal state ' . $currentState . ', ack',
+                    1
+                );
+                $this->ack();
+            }
+
+            // Idempotency: a webhook whose txid we already finalized is a no-op.
+            if ($txid !== '' && $processedTxid !== '' && hash_equals($processedTxid, $txid)) {
+                blockbee::savePayment($orderId, $paymentId, $toSave);
+                $db->execute('COMMIT');
+                PrestaShopLogger::addLog('[BlockBee] Order ' . $orderId . ' txid already processed, ack', 1);
+                $this->ack();
+            }
+
+            if (!$this->isPaid($payload)) {
+                blockbee::savePayment($orderId, $paymentId, $toSave);
+                $db->execute('COMMIT');
+                PrestaShopLogger::addLog(
+                    '[BlockBee] Order ' . $orderId . ' webhook not paid yet (is_paid='
+                    . var_export($payload['is_paid'] ?? null, true) . ', status='
+                    . var_export($payload['status'] ?? null, true) . ')',
+                    1
+                );
+                $this->ack();
+            }
+
+            // setCurrentState reliably persists to both ps_order_history and
+            // ps_orders.current_state in one call. The customer e-mail is sent
+            // after COMMIT (below) so SMTP latency never holds the lock.
+            $changed = $order->setCurrentState($paidState, 0);
+            $sendPaidEmail = true;
+
             PrestaShopLogger::addLog(
-                '[BlockBee] Order ' . $orderId . ' webhook not paid yet (is_paid='
-                . var_export($payload['is_paid'] ?? null, true) . ', status='
-                . var_export($payload['status'] ?? null, true) . ')',
+                '[BlockBee] Order ' . $orderId . ' state transition '
+                . $currentState . ' → ' . $paidState . ' result: '
+                . var_export($changed, true),
                 1
             );
-            $this->ack();
+
+            // Annotate the existing OrderPayment row (from validateOrder) with
+            // the txid + crypto coin instead of creating a duplicate row.
+            if ($txid !== '') {
+                $payments = $order->getOrderPaymentCollection();
+                if (count($payments) > 0) {
+                    $payment = $payments[0];
+                    $payment->transaction_id = $txid;
+                    $payment->payment_method = $this->module->displayName
+                        . (!empty($payload['paid_coin']) ? ' (' . strtoupper((string) $payload['paid_coin']) . ')' : '');
+                    $payment->save();
+                }
+                // Record the finalized txid so any later duplicate is a no-op.
+                $toSave['blockbee_processed_txid'] = $txid;
+            }
+
+            blockbee::savePayment($orderId, $paymentId, $toSave);
+
+            $db->execute('COMMIT');
+        } catch (Exception $e) {
+            $db->execute('ROLLBACK');
+            PrestaShopLogger::addLog('[BlockBee] Callback handler exception: ' . $e->getMessage(), 3);
+            throw $e;
         }
 
-        // setCurrentState is the simplest reliable transition — it persists to
-        // both ps_order_history and ps_orders.current_state in one call. The
-        // OrderHistory dance with changeIdOrderState() + addWithemail() can
-        // silently leave ps_orders.current_state unchanged in some setups.
-        $changed = $order->setCurrentState($paidState, 0);
-
-        PrestaShopLogger::addLog(
-            '[BlockBee] Order ' . $orderId . ' state transition '
-            . $currentState . ' → ' . $paidState . ' result: '
-            . var_export($changed, true),
-            1
-        );
-
-        // Send the "order paid" e-mail to the customer (setCurrentState alone
-        // doesn't trigger it). Look up the freshly-created history row.
-        $history = OrderHistory::getLastOrderState($orderId);
-        if (Validate::isLoadedObject($history)) {
-            $orderHistoryRow = new OrderHistory();
-            $orderHistoryRow->id_order = $orderId;
-            $orderHistoryRow->id_order_state = $paidState;
-            $orderHistoryRow->id_employee = 0;
-            $orderHistoryRow->addWithemail();
-        }
-
-        // Annotate the existing OrderPayment row (from validateOrder) with
-        // the txid + crypto coin instead of creating a duplicate row.
-        if (!empty($payload['txid'])) {
-            $payments = $order->getOrderPaymentCollection();
-            if (count($payments) > 0) {
-                $payment = $payments[0];
-                $payment->transaction_id = (string) $payload['txid'];
-                $payment->payment_method = $this->module->displayName
-                    . (!empty($payload['paid_coin']) ? ' (' . strtoupper((string) $payload['paid_coin']) . ')' : '');
-                $payment->save();
+        // Send the "order paid" e-mail after COMMIT. setCurrentState above does
+        // not itself e-mail; sendEmail (not addWithemail) mails the customer
+        // without inserting a second, duplicate history row.
+        if ($sendPaidEmail) {
+            try {
+                $emailHistory = new OrderHistory();
+                $emailHistory->id_order = $orderId;
+                $emailHistory->id_order_state = $paidState;
+                $emailHistory->sendEmail($order);
+            } catch (Exception $e) {
+                PrestaShopLogger::addLog(
+                    '[BlockBee] Order ' . $orderId . ' paid but confirmation email failed: ' . $e->getMessage(),
+                    2
+                );
             }
         }
 

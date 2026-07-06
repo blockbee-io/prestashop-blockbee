@@ -53,7 +53,7 @@ class blockbee extends PaymentModule
     {
         $this->name = 'blockbee';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.0';
+        $this->version = '2.1.1';
         $this->ps_versions_compliancy = ['min' => '1.7', 'max' => '9.99.99'];
         $this->author = 'BlockBee';
         $this->controllers = ['validation', 'callback'];
@@ -102,6 +102,7 @@ class blockbee extends PaymentModule
                 `id_order` INT UNSIGNED NOT NULL,
                 `payment_id` VARCHAR(64) NOT NULL,
                 `payload` LONGTEXT NULL,
+                `nonce` VARCHAR(64) NOT NULL DEFAULT \'\',
                 `created_at` INT UNSIGNED NOT NULL,
                 PRIMARY KEY (`id_order`),
                 UNIQUE KEY `payment_id` (`payment_id`)
@@ -251,8 +252,19 @@ class blockbee extends PaymentModule
             return [];
         }
 
+        // Bind a per-cart/customer CSRF token to the checkout action URL so the
+        // link the customer actually submits carries a token that validation.php
+        // can verify before it creates any order.
+        $cart = $params['cart'];
+        $csrfToken = self::csrfToken((int) $cart->id, (int) $cart->id_customer);
+
         $this->context->smarty->assign([
-            'action' => $this->context->link->getModuleLink($this->name, 'validation', [], true),
+            'action' => $this->context->link->getModuleLink(
+                $this->name,
+                'validation',
+                ['bb_token' => $csrfToken],
+                true
+            ),
         ]);
 
         $option = new \PrestaShop\PrestaShop\Core\Payment\PaymentOption();
@@ -315,7 +327,7 @@ class blockbee extends PaymentModule
     /**
      * Persist (or update) the BlockBee payment metadata for a PrestaShop order.
      */
-    public static function savePayment($id_order, $payment_id, array $payload)
+    public static function savePayment($id_order, $payment_id, array $payload, $nonce = null)
     {
         $db = Db::getInstance();
         $payload_json = pSQL(json_encode($payload), true);
@@ -328,16 +340,48 @@ class blockbee extends PaymentModule
         );
 
         if (empty($exists)) {
+            // The nonce is written once, when the order row is created at checkout.
+            $nonce_sql = $nonce === null ? '' : pSQL($nonce);
             $db->execute(
-                'INSERT INTO `' . _DB_PREFIX_ . "blockbee_order` (`id_order`, `payment_id`, `payload`, `created_at`)
-                 VALUES (" . $id_order . ", '" . $payment_id . "', '" . $payload_json . "', " . $now . ')'
+                'INSERT INTO `' . _DB_PREFIX_ . "blockbee_order` (`id_order`, `payment_id`, `payload`, `nonce`, `created_at`)
+                 VALUES (" . $id_order . ", '" . $payment_id . "', '" . $payload_json . "', '" . $nonce_sql . "', " . $now . ')'
             );
         } else {
+            // Leave `nonce` untouched on update (the webhook handler overwrites the
+            // payload but must not clobber the per-order secret) unless a caller
+            // explicitly supplies one.
+            $nonce_set = $nonce === null ? '' : ", `nonce` = '" . pSQL($nonce) . "'";
             $db->execute(
                 'UPDATE `' . _DB_PREFIX_ . "blockbee_order` SET `payment_id` = '" . $payment_id . "',
-                 `payload` = '" . $payload_json . "' WHERE `id_order` = " . $id_order
+                 `payload` = '" . $payload_json . "'" . $nonce_set . ' WHERE `id_order` = ' . $id_order
             );
         }
+    }
+
+    /**
+     * Generate an unguessable per-order secret to embed in the callback URL.
+     * BlockBee echoes it back on every webhook so the callback handler can reject
+     * any callback whose nonce it doesn't recognise.
+     */
+    public static function generateNonce($len = 32)
+    {
+        return bin2hex(random_bytes((int) ceil($len / 2)));
+    }
+
+    /**
+     * Per-cart/customer CSRF token bound to the checkout action URL. Derived
+     * (not stored) so it can be recomputed and constant-time compared in the
+     * validation controller — a cross-site POST that doesn't carry the matching
+     * token can never trigger validateOrder. Keyed on the per-install cookie
+     * secret so it is unforgeable by a third party.
+     */
+    public static function csrfToken($id_cart, $id_customer)
+    {
+        return hash_hmac(
+            'sha256',
+            'blockbee-checkout|' . (int) $id_cart . '|' . (int) $id_customer,
+            _COOKIE_KEY_
+        );
     }
 
     public static function findPayment($id_order)

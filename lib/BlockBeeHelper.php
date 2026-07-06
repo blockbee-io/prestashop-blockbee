@@ -154,12 +154,21 @@ class BlockBeeHelper
         curl_close($ch);
 
         if ($response === false || $err !== '' || $code >= 400) {
-            self::log(sprintf('HTTP GET failed (code=%d, err=%s) — %s', $code, $err, $url));
+            self::log(sprintf('HTTP GET failed (code=%d, err=%s) — %s', $code, $err, self::redact_url($url)));
 
             return null;
         }
 
         return (string) $response;
+    }
+
+    /**
+     * Strip the merchant apikey out of an outbound URL before it can reach a log.
+     * Replaces the apikey query value with *** so the secret never lands in ps_log.
+     */
+    private static function redact_url($url)
+    {
+        return preg_replace('/(apikey=)[^&]*/i', '$1***', (string) $url);
     }
 
     private static function log($message)
