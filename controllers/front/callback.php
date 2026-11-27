@@ -107,6 +107,12 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
                 $toSave['blockbee_processed_txid'] = $processedTxid;
             }
 
+            // Keep what the order asked BlockBee for, so later webhooks can be
+            // checked against it after this one replaces the stored payload.
+            $requested = $this->requestedAmount($storedPayload, $order);
+            $toSave['blockbee_requested_value'] = $requested['value'];
+            $toSave['blockbee_requested_currency'] = $requested['currency'];
+
             $txid = isset($payload['txid']) ? (string) $payload['txid'] : '';
 
             // Authoritative state read under the lock.
@@ -140,6 +146,17 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
                     . var_export($payload['status'] ?? null, true) . ')',
                     1
                 );
+                $this->ack();
+            }
+
+            // The signed body must be for what this order asked for. A mismatch
+            // can't fix itself on a re-send, so ack it and leave the order
+            // waiting for the merchant to check.
+            $mismatch = $this->amountMismatch($payload, $requested, $orderId);
+            if ($mismatch !== null) {
+                blockbee::savePayment($orderId, $paymentId, $toSave);
+                $db->execute('COMMIT');
+                PrestaShopLogger::addLog('[BlockBee] Order ' . $orderId . ' not marked paid: ' . $mismatch, 3);
                 $this->ack();
             }
 
@@ -200,22 +217,99 @@ class BlockBeeCallbackModuleFrontController extends ModuleFrontController
         $this->ack();
     }
 
+    /**
+     * BlockBee's checkout webhook carries is_paid = 1 once the payment is
+     * complete (docs.blockbee.io/webhooks/checkout-payments-webhook). 2.1.1 also
+     * took a status of 'paid', 'success', 'completed' or 'confirmed' as paid
+     * even when is_paid was not 1; those words are not documented, so a status
+     * alone no longer counts.
+     */
     private function isPaid(array $payload)
     {
-        if (isset($payload['is_paid'])) {
-            $v = $payload['is_paid'];
-            if ($v === true || $v === 1 || $v === '1' || strtolower((string) $v) === 'true') {
-                return true;
-            }
-        }
-        if (isset($payload['status'])) {
-            $s = strtolower((string) $payload['status']);
-            if (in_array($s, ['done', 'paid', 'success', 'completed', 'confirmed'], true)) {
-                return true;
-            }
+        if (!isset($payload['is_paid'])) {
+            return false;
         }
 
-        return false;
+        $v = $payload['is_paid'];
+
+        return $v === true || $v === 1 || $v === '1' || strtolower((string) $v) === 'true';
+    }
+
+    /**
+     * The amount and currency this order asked BlockBee for. The checkout
+     * stores them as `value` / `currency`; the first webhook carries them
+     * forward as blockbee_requested_* (a webhook replaces the stored payload).
+     * Rows a webhook already replaced before this check existed fall back to
+     * the order's own total.
+     */
+    private function requestedAmount(array $storedPayload, Order $order)
+    {
+        if (isset($storedPayload['blockbee_requested_value'], $storedPayload['blockbee_requested_currency'])) {
+            return [
+                'value' => (string) $storedPayload['blockbee_requested_value'],
+                'currency' => (string) $storedPayload['blockbee_requested_currency'],
+            ];
+        }
+
+        // The checkout row has no payment_id field; a stored webhook body does.
+        if (isset($storedPayload['value'], $storedPayload['currency']) && !isset($storedPayload['payment_id'])) {
+            return [
+                'value' => $this->money($storedPayload['value']),
+                'currency' => strtolower((string) $storedPayload['currency']),
+            ];
+        }
+
+        $currency = new Currency((int) $order->id_currency);
+
+        return [
+            'value' => $this->money($order->total_paid),
+            'currency' => Validate::isLoadedObject($currency) ? strtolower($currency->iso_code) : '',
+        ];
+    }
+
+    /**
+     * Null when the signed webhook is for the amount and currency the order
+     * asked for, or a short reason when it is not. A body with neither field
+     * cannot be checked and passes, with a log entry.
+     */
+    private function amountMismatch(array $payload, array $requested, $orderId)
+    {
+        if (!isset($payload['value'], $payload['currency'])) {
+            PrestaShopLogger::addLog('[BlockBee] Order ' . (int) $orderId . ' webhook has no value/currency to check', 2);
+
+            return null;
+        }
+
+        $value = is_numeric($payload['value']) ? $this->money($payload['value']) : '';
+        $currency = strtolower((string) $payload['currency']);
+
+        if ($value !== $requested['value'] || $currency !== $requested['currency']) {
+            return sprintf(
+                'webhook is for %s %s, but the order asked for %s %s',
+                $value,
+                $currency,
+                $requested['value'],
+                $requested['currency']
+            );
+        }
+
+        // BlockBee reports the payment complete, so this only warns.
+        if (isset($payload['paid_amount_fiat']) && is_numeric($payload['paid_amount_fiat'])
+            && (float) $payload['paid_amount_fiat'] < (float) $value) {
+            PrestaShopLogger::addLog(
+                '[BlockBee] Order ' . (int) $orderId . ' paid_amount_fiat ' . $this->money($payload['paid_amount_fiat'])
+                . ' is below the order value ' . $value . ' ' . $currency . '; marked paid as BlockBee reports it complete',
+                2
+            );
+        }
+
+        return null;
+    }
+
+    /** A fiat amount as a 2-decimal string, as checkout sends it. */
+    private function money($amount)
+    {
+        return number_format((float) $amount, 2, '.', '');
     }
 
     private function getSignatureHeader()

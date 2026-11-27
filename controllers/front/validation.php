@@ -121,6 +121,15 @@ class BlockBeeValidationModuleFrontController extends ModuleFrontController
                 . (is_array($response) ? json_encode($response) : 'no response'),
                 3
             );
+
+            // The order was created above for a payment that can now never
+            // start. Cancel it rather than leave it waiting: 2.0 removed the
+            // cron job that cancelled old unpaid orders.
+            $failedOrder = new Order($orderId);
+            if (Validate::isLoadedObject($failedOrder)) {
+                $failedOrder->setCurrentState((int) Configuration::get('PS_OS_CANCELED'));
+            }
+
             exit($this->module->l('Could not create a BlockBee payment. Please try again.', 'validation'));
         }
 

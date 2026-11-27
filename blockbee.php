@@ -53,7 +53,7 @@ class blockbee extends PaymentModule
     {
         $this->name = 'blockbee';
         $this->tab = 'payments_gateways';
-        $this->version = '2.1.1';
+        $this->version = '2.1.2';
         $this->ps_versions_compliancy = ['min' => '1.7', 'max' => '9.99.99'];
         $this->author = 'BlockBee';
         $this->controllers = ['validation', 'callback'];
@@ -114,7 +114,7 @@ class blockbee extends PaymentModule
         }
 
         // Leave blockbee_checkout_title empty by default — the display sites
-        // fall back to $this->l('Pay with Cryptocurrency') so the customer
+        // fall back to $this->l('Pay with BlockBee') so the customer
         // sees a translated label until the merchant sets a custom title.
         if (!Configuration::hasKey('blockbee_active')) {
             Configuration::updateValue('blockbee_active', 0);
@@ -234,7 +234,7 @@ class blockbee extends PaymentModule
             'blockbee_active' => (int) Tools::getValue('blockbee_active', Configuration::get('blockbee_active')),
             'blockbee_checkout_title' => Tools::getValue(
                 'blockbee_checkout_title',
-                Configuration::get('blockbee_checkout_title') ?: $this->l('Pay with Cryptocurrency')
+                Configuration::get('blockbee_checkout_title') ?: $this->l('Pay with BlockBee')
             ),
             'blockbee_api_key' => Tools::getValue('blockbee_api_key', Configuration::get('blockbee_api_key')),
         ];
@@ -268,7 +268,7 @@ class blockbee extends PaymentModule
         ]);
 
         $option = new \PrestaShop\PrestaShop\Core\Payment\PaymentOption();
-        $option->setCallToActionText(Configuration::get('blockbee_checkout_title') ?: $this->l('Pay with Cryptocurrency'))
+        $option->setCallToActionText(Configuration::get('blockbee_checkout_title') ?: $this->l('Pay with BlockBee'))
             ->setForm($this->context->smarty->fetch('module:blockbee/views/templates/front/payment_form.tpl'))
             ->setLogo(Media::getMediaPath(_PS_MODULE_DIR_ . $this->name . '/views/img/blockbee_checkout.png'));
 

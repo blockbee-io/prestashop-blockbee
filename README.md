@@ -145,6 +145,10 @@ You can find more documentation about our service on our [website](https://block
 
 ### Changelog
 
+#### 2.1.2
+* Bugfixes
+* The checkout title now defaults to "Pay with BlockBee"
+
 #### 2.1.1
 * Bugfixes and security hardening
 

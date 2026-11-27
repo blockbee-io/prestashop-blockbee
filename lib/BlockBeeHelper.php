@@ -151,7 +151,12 @@ class BlockBeeHelper
         $response = curl_exec($ch);
         $err = curl_error($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        // curl_close() does nothing since PHP 8.0 (the handle is freed when $ch
+        // goes away) and is deprecated in 8.5, where the notice could end up in
+        // a webhook or checkout response.
+        if (PHP_VERSION_ID < 80000) {
+            curl_close($ch);
+        }
 
         if ($response === false || $err !== '' || $code >= 400) {
             self::log(sprintf('HTTP GET failed (code=%d, err=%s) — %s', $code, $err, self::redact_url($url)));
